@@ -1,11 +1,10 @@
 from typing import Annotated
 from fastapi import APIRouter, Depends, Response, Header, status, Cookie
 
-import database as db
 import security, schema, depends
 from exceptions import *
 
-router = APIRouter(prefix='/auth', tags=['Аккаунты'])
+router = APIRouter(prefix='/auth', tags=['Авторизация'])
 
 @router.post('/register', status_code=status.HTTP_201_CREATED)
 def register(
