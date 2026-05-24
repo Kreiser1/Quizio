@@ -1,10 +1,16 @@
 from fastapi import APIRouter, status, Path
 
 import database as db
-import security, schema, depends, usersvc
+import security, schema, depends, usersvc, config
 from exceptions import *
 
 router = APIRouter(prefix='/admin', tags=['Администрирование'])
+
+@router.get('/users', response_model=list[schema.Username])
+def get_users(session: depends.Session, administrator: depends.Administrator):
+    """Получить список пользователей."""
+
+    return session.execute(db.select(db.User.username)).scalars().all()
 
 @router.patch('/users/{username}', response_model=schema.UserProfile)
 def update_profile(session: depends.Session, payload: schema.UserUpdate | schema.UserCredentialsUpdate, administrator: depends.Administrator,
@@ -32,7 +38,7 @@ def update_profile(session: depends.Session, payload: schema.UserUpdate | schema
     return profile
 
 @router.delete('/users/{username}', status_code=status.HTTP_200_OK)
-def update_profile(session: depends.Session, administrator: depends.Administrator,
+def delete_profile(session: depends.Session, administrator: depends.Administrator,
        username: schema.Username = Path(...)):
     """Удалить профиль пользователя по имени."""
 

@@ -2,8 +2,19 @@ import importlib
 import pkgutil
 from pathlib import Path
 from fastapi import APIRouter
+from schema import Configuration
+import config
 
-api_router = APIRouter(prefix='/api')
+api_router = APIRouter(prefix='/api', tags=['API'])
+
+@api_router.get('/', response_model=Configuration)
+def configuration() -> Configuration:
+    return Configuration(
+        auth_cooldown=config.AUTH_COOLDOWN,
+        auth_expiration=config.AUTH_EXPIRATION,
+        image_size_limit=config.IMAGE_SIZE_LIMIT,
+        quiz_size_limit=config.QUIZ_SIZE_LIMIT
+    )
 
 package_dir = Path(__file__).resolve().parent
 

@@ -15,6 +15,7 @@ def create_quiz(
         creation_time=creation_time,
         last_edit_username=author
     )
+
     new_quiz.questions = quiz_payload.questions
 
     try:

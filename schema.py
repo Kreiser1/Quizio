@@ -41,6 +41,13 @@ def parse_datetime(datetime_: DateTime) -> datetime:
     return datetime.strptime(datetime_, '%Y-%m-%d %H:%M:%S')
 
 
+class Configuration(BaseModel):
+    auth_cooldown: Count
+    auth_expiration: Count
+    image_size_limit: Count
+    quiz_size_limit: Count
+
+
 class UserProfile(BaseModel):
     username: Username
     full_name: FullName | None = None
@@ -77,7 +84,6 @@ class UserRecovery(BaseModel):
 
 
 class UserCredentialsUpdate(BaseModel):
-    username: Username
     password: Password
     new_password: Password | None = None
     new_email: Email | None = None
@@ -141,7 +147,7 @@ class Quiz(BaseModel):
 
     @classmethod
     def from_yaml(cls, text: str) -> list[Question]:
-        return cls.QuestionsYaml.model_validate(yaml.safe_load(text))
+        return cls.QuestionsYaml.model_validate(yaml.safe_load(text)).questions
 
     @classmethod
     def to_yaml(cls, questions: list[Question]) -> str:

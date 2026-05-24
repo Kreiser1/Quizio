@@ -10,7 +10,7 @@ router = APIRouter(prefix='/auth', tags=['Авторизация'])
 def register(
     session: depends.Session, 
     payload: schema.UserRegistration,
-    cooldown: depends.Cooldown2
+    cooldown: depends.Cooldown
 ):
     """Регистрация нового пользователя."""
 
@@ -26,7 +26,7 @@ def login(
     session: depends.Session,
     payload: schema.UserAuthorization,
     response: Response,
-    cooldown: depends.Cooldown1,
+    cooldown: depends.Cooldown,
     user_agent: Annotated[str | None, Header()] = None
 ):
     """Вход в систему с установкой токенов авторизации в куках."""
@@ -54,12 +54,34 @@ def login(
         secure=True
     )
 
+@router.post('/refresh', status_code=status.HTTP_200_OK)
+def refresh(
+    session: depends.Session,
+    refresh_token: depends.RefreshToken,
+    response: Response,
+    cooldown: depends.Cooldown
+):
+    """Обновление токенов авторизации в куках."""
+
+    access_token = security.refresh(session, refresh_token)
+    
+    if not access_token:
+        raise UnauthorizedHTTPException("Ошибка при авторизации. Проверьте токен.")
+
+    response.set_cookie(
+        key=security.ACCESS_COOKIE,
+        value=access_token,
+        httponly=True,
+        samesite="none",
+        secure=True
+    )
+
 @router.post('/logout', status_code=status.HTTP_200_OK)
 def logout(
     session: depends.Session,
     response: Response,
     refresh_token: depends.RefreshToken,
-    cooldown: depends.Cooldown1
+    cooldown: depends.Cooldown
 ):
     """Выход из системы, удаление сессии и очистка куков."""
 
@@ -74,7 +96,7 @@ def update(
     session: depends.Session,
     username: depends.Username,
     payload: schema.UserCredentialsUpdate,
-    cooldown: depends.Cooldown1
+    cooldown: depends.Cooldown
 ):
     """Обновление пароля или E-mail авторизованного пользователя."""
     
@@ -89,13 +111,15 @@ from pydantic import TypeAdapter, ValidationError
 def recover(
     session: depends.Session,
     payload: Annotated[dict | str, Body()],
-    cooldown: depends.Cooldown2
+    cooldown: depends.Cooldown
 ):
     """
     Запрос на восстановление пароля пользователя.
     1. Если передан JSON с username и email -> Инициирует сброс.
     2. Если передана строка (токен) -> Производит сброс.
     """
+
+    raise NotImplementedHTTPException("Закрыто до внедрения почтового сервера.")
     
     try:
         user_recovery_payload = TypeAdapter(schema.UserRecovery).validate_python(payload)

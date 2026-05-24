@@ -9,8 +9,7 @@ import security, schema, config, usersvc
 from exceptions import *
 
 
-Cooldown1 = Annotated[None, Depends(RateLimiter(times=5, seconds=10))]
-Cooldown2 = Annotated[None, Depends(RateLimiter(times=2, seconds=30))]
+Cooldown = Annotated[None, Depends(RateLimiter(times=1, seconds=config.AUTH_COOLDOWN))]
 
 Session = Annotated[db.Session, Depends(db.session)]
 
@@ -55,7 +54,7 @@ def _get_username(
     username = security.login(refresh_token, access_token)
 
     if not username:
-        raise UnauthorizedHTTPException()
+        raise UnauthorizedHTTPException("Ошибка при авторизации. Попробуйте обновить токен.")
     
     return username
 

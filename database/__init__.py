@@ -1,6 +1,6 @@
 import sqlite3
 
-from sqlalchemy import create_engine, exists, select, update, delete, func, and_
+from sqlalchemy import create_engine, exists, select, update, insert, delete, func, and_
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship, sessionmaker, Session
 from sqlalchemy import String, Text, UniqueConstraint, CheckConstraint, Integer, Table, Column, ForeignKey, BigInteger
 from sqlalchemy.exc import IntegrityError

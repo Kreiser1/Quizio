@@ -22,10 +22,10 @@ def create_quiz(
     """Создать новую викторину."""
     yaml_text = schema.Quiz.to_yaml(payload.questions)
 
-    if len(yaml_text.encode('utf-8')) > config.QUIZ_SIZE_LIMIT:
+    if len(yaml_text) > config.QUIZ_SIZE_LIMIT:
         raise UnprocessableHTTPException("Превышен лимит размера квиза.")
 
-    if isinstance(payload.icon, str) and len(payload.icon.encode('utf-8')) > config.IMAGE_SIZE_LIMIT:
+    if isinstance(payload.icon, str) and len(payload.icon) > config.IMAGE_SIZE_LIMIT:
         raise UnprocessableHTTPException("Иконка слишком большая.")
 
     quiz = quizsvc.create_quiz(session, username, payload)
@@ -85,7 +85,7 @@ def update_quiz(
         raise ForbiddenHTTPException("Вы не являетесь автором этой викторины.")
 
     if isinstance(payload, str):
-        if len(payload.encode('utf-8')) > config.QUIZ_SIZE_LIMIT:
+        if len(payload) > config.QUIZ_SIZE_LIMIT:
             raise UnprocessableHTTPException("Размер квиза превышает лимит.")
         
         try:
@@ -95,12 +95,12 @@ def update_quiz(
         except schema.YAMLError:
             raise UnprocessableHTTPException("Некорректный формат YAML.")
     else:
-        if isinstance(payload.icon, schema.Base64) and len(payload.icon.encode('utf-8')) > config.IMAGE_SIZE_LIMIT:
+        if isinstance(payload.icon, schema.Base64) and len(payload.icon) > config.IMAGE_SIZE_LIMIT:
             raise UnprocessableHTTPException("Иконка слишком большая.")
 
         yaml_text = schema.Quiz.to_yaml(payload.questions)
 
-        if len(yaml_text.encode('utf-8')) > config.QUIZ_SIZE_LIMIT:
+        if len(yaml_text) > config.QUIZ_SIZE_LIMIT:
             raise UnprocessableHTTPException("Размер квиза превышает лимит.")
 
     if not quizsvc.update_quiz(session, username, id, payload):
@@ -194,7 +194,7 @@ def download_quiz_yaml(
     if not quiz:
         raise NotFoundHTTPException("Викторина не найдена.")
 
-    file_like = io.BytesIO(schema.Quiz.to_yaml(quiz.questions).encode('utf-8'))
+    file_like = io.BytesIO(schema.Quiz.to_yaml(quiz.questions))
     filename = f"quiz_{id}.yaml"
 
     return StreamingResponse(
