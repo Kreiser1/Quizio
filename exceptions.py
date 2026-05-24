@@ -20,6 +20,12 @@ class ForbiddenHTTPException(HTTPException):
 	def __init__(self, detail: str | None = "Отказано в доступе."):
 		super().__init__(status_code=status.HTTP_403_FORBIDDEN, detail=detail)
 
+
 class UnprocessableHTTPException(HTTPException):
 	def __init__(self, detail: str | None = "Ошибка при обработке."):
 		super().__init__(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=detail)
+
+
+class NotImplementedHTTPException(HTTPException):
+	def __init__(self, detail: str | None = "Эндпоинт не имплементирован."):
+		super().__init__(status_code=status.HTTP_405_METHOD_NOT_ALLOWED, detail=detail)

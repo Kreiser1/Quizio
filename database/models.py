@@ -75,7 +75,7 @@ class Auth(Base):
     __tablename__ = 'auth'
 
     refresh_token: Mapped[str] = mapped_column(String(128), primary_key=True)
-    username: Mapped[str] = mapped_column(String(32), nullable=False)
+    username: Mapped[str] = mapped_column(String(32), ForeignKey('users.username', ondelete='CASCADE'), nullable=False)
     creation_time: Mapped[str] = mapped_column(String(32), nullable=False)
     expiration_time: Mapped[int] = mapped_column(BigInteger, nullable=False)
     device: Mapped[str] = mapped_column(String(128), nullable=True)

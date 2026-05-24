@@ -117,14 +117,15 @@ def login(refresh_token: schema.RefreshToken, access_token: schema.AccessToken) 
 def logout(session: db.Session, refresh_token: schema.RefreshToken) -> bool:
     return session.execute(db.delete(db.Auth).where(db.Auth.refresh_token == refresh_token)).rowcount > 0
 
-def update(session: db.Session,user_credentials_update_payload: schema.UserCredentialsUpdate) -> bool:
-    password_hash = session.execute(db.select(db.User.password_hash).where(db.User.username == user_credentials_update_payload.username)).scalar()
+def update(session: db.Session,user_credentials_update_payload: schema.UserCredentialsUpdate, force: bool = False) -> bool:
+    if not force:
+        password_hash = session.execute(db.select(db.User.password_hash).where(db.User.username == user_credentials_update_payload.username)).scalar()
 
-    if not password_hash:
-        return None
-    
-    if not compare(user_credentials_update_payload.password, password_hash):
-        return None
+        if not password_hash:
+            return None
+        
+        if not compare(user_credentials_update_payload.password, password_hash):
+            return None
     
     params = {
         **({'email': encode({'email': user_credentials_update_payload.new_email})} if user_credentials_update_payload.new_email else {}),

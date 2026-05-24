@@ -31,6 +31,7 @@ FullName = Annotated[str, StringConstraints(min_length=2, max_length=128, strip_
 QuestionType = Literal['select', 'multiselect', 'input']
 ConnectionState = Literal['connected', 'disconnected', 'banned']
 Tag = Annotated[str, StringConstraints(strip_whitespace=True, max_length=32, pattern=r'^#\w+(?:_\w+)*$')]
+RoomPrivacy = Literal['public', 'private']
 
 def format_datetime(datetime: datetime) -> DateTime:
     return datetime.strftime('%Y-%m-%d %H:%M:%S')
@@ -44,7 +45,7 @@ class UserProfile(BaseModel):
     full_name: FullName | None = None
     email: Email | None = None
     avatar: Base64 | Index = 0
-    creation_time: DateTime
+    creation_time: DateTime | None = None
     role: Role
 
 
@@ -158,6 +159,7 @@ class RoomTeam(BaseModel):
 class Room(BaseModel):
     title: Title | None = None
     users: list[RoomUser]
+    privacy: RoomPrivacy
     quiz: Quiz
 
     @computed_field

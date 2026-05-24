@@ -1,4 +1,5 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, HTTPException, status
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 import security, schema, config, database as db
 
@@ -14,7 +15,6 @@ from api import api_router
 
 app = FastAPI(debug=config.DEBUG, title='Quizio', description='Quizio API')
 
-# Переопределяем генерацию схемы OpenAPI, чтобы Swagger знал про куки
 def custom_openapi():
     if app.openapi_schema:
         return app.openapi_schema
@@ -44,6 +44,19 @@ def custom_openapi():
     return app.openapi_schema
 
 app.openapi = custom_openapi
+
+@app.exception_handler(HTTPException)
+def http_too_many_requests(request: Request, exception: HTTPException):
+    if exception.status_code == status.HTTP_429_TOO_MANY_REQUESTS:
+        return JSONResponse(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            content={"detail": "Слишком много попыток. Пожалуйста, подождите перед следующей отправкой."}
+        )
+    
+    return JSONResponse(
+        status_code=exception.status_code,
+        content={"detail": exception.detail}
+    )
 
 origins = [
     "http://localhost:3000",

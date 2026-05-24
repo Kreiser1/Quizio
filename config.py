@@ -12,6 +12,8 @@ ADMIN_PASSWORD =_config.get('ADMIN_PASSWORD')
 TOKEN_EXPIRATION = int(_config.get('TOKEN_EXPIRATION') or 1209600)
 AUTH_COST = int(_config.get('AUTH_COST') or 65536)
 AUTH_COOLDOWN = int(_config.get('AUTH_COOLDOWN') or 10)
+IMAGE_SIZE_LIMIT = int(_config.get('AVATAR_SIZE_LIMIT') or 2097152)
+QUIZ_SIZE_LIMIT = int(_config.get('QUIZ_SIZE_LIMIT') or 8388608)
 DEBUG = _config.get('DEBUG').lower() == 'true'
 
 if not TOKEN_SECRET or not AUTH_SECRET:
