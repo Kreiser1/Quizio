@@ -99,27 +99,25 @@ def get_user_quizzes(session: db.Session, username: schema.Username) -> list[sch
 def update_quiz(
     session: db.Session, 
     username: schema.Username,
-    quiz_payload: schema.Quiz 
+    id: schema.Index,
+    quiz_payload: schema.QuizCreate 
 ) -> bool:
     quiz = session.execute(db.select(db.Quiz).where(db.Quiz.id == quiz_payload.id)).scalar_one_or_none()
 
     if not quiz:
         return False
 
-    if quiz_payload.title is not None:
-        quiz.title = quiz_payload.title
-    if quiz_payload.icon is not None:
-        quiz.icon = quiz_payload.icon
-    if quiz_payload.questions is not None:
-        quiz.questions = quiz_payload.questions
+    quiz.title = quiz_payload.title
+    quiz.icon = quiz_payload.icon
+    quiz.questions = quiz_payload.questions
 
     quiz.edit_time = schema.format_datetime(datetime.now())
     quiz.last_edit_username = username
 
     if quiz_payload.tags is not None:
-        session.execute(db.delete(db.tag_quiz).where(db.tag_quiz.c.quiz_id == quiz_payload.id))
+        session.execute(db.delete(db.tag_quiz).where(db.tag_quiz.c.quiz_id == id))
         if quiz_payload.tags:
-            tag_values = [{"tag": tag, "quiz_id": quiz_payload.id} for tag in set(quiz_payload.tags)]
+            tag_values = [{"tag": tag, "quiz_id": id} for tag in quiz_payload.tags]
             session.execute(db.insert(db.tag_quiz).values(tag_values))
 
     try:
@@ -133,10 +131,10 @@ def search_quizzes(
     session: db.Session, 
     query: schema.Title | None = None, 
     tags: set[schema.Tag] | None = None,
-    count: schema.Count = 25
+    count: schema.Count = 25,
+    offset: schema.Index = 0
 ) -> list[schema.QuizPreview]:
     stmt = db.select(db.Quiz)
-
     conditions = []
 
     if query:
@@ -152,7 +150,7 @@ def search_quizzes(
     if conditions:
         stmt = stmt.where(db.and_(*conditions))
         
-    stmt = stmt.limit(count)
+    stmt = stmt.limit(count).offset(offset)
     quizzes = session.execute(stmt).scalars().all()
 
     if not quizzes:
@@ -163,13 +161,14 @@ def search_quizzes(
     tags_result = session.execute(db.select(db.tag_quiz.c.quiz_id, db.tag_quiz.c.tag).where(db.tag_quiz.c.quiz_id.in_(quiz_ids))).all()
 
     tags_map = {}
-    for q_id, tag in tags_result:
-        if q_id not in tags_map:
-            tags_map[q_id] = set()
-        tags_map[q_id].add(tag)
+
+    for quiz_id, tag in tags_result:
+        if quiz_id not in tags_map:
+            tags_map[quiz_id] = set()
+        tags_map[quiz_id].add(tag)
 
     result = []
-
+    
     for quiz in quizzes:
         result.append(schema.QuizPreview(
             id=quiz.id,
@@ -180,7 +179,6 @@ def search_quizzes(
         ))
         
     return result
-
 
 def is_quiz_author(session: db.Session, id: schema.Index, username: schema.Username) -> bool:
     return session.query(db.user_quiz.c.username).filter(

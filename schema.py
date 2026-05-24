@@ -1,6 +1,7 @@
 from datetime import datetime
 from typing import Annotated, Literal
 import yaml
+from yaml import YAMLError
 
 from pydantic import (
     BaseModel,
@@ -112,7 +113,6 @@ class QuizPreview(BaseModel):
 class QuizCreate(BaseModel):
     title: Title
     icon: Base64 | Index = 0
-    author: Username
     questions: list[Question]
     tags: set[Tag] | None = None
 
