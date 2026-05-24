@@ -21,14 +21,14 @@ def register(
         
     return user_profile
 
-@router.post('/login', status_code=status.HTTP_200_OK)
+@router.post('/login', response_model=schema.Tokens)
 def login(
     session: depends.Session,
     payload: schema.UserAuthorization,
     response: Response,
     cooldown: depends.Cooldown,
     user_agent: Annotated[str | None, Header()] = None
-):
+) -> schema.Tokens:
     """Вход в систему с установкой токенов авторизации в куках."""
 
     tokens = security.authorize(session, payload, user_agent)
@@ -54,13 +54,15 @@ def login(
         secure=True
     )
 
-@router.post('/refresh', status_code=status.HTTP_200_OK)
+    return schema.Tokens(access_token=access_token, refresh_token=refresh_token)
+
+@router.post('/refresh', response_model=schema.Tokens)
 def refresh(
     session: depends.Session,
     refresh_token: depends.RefreshToken,
     response: Response,
     cooldown: depends.Cooldown
-):
+) -> schema.Tokens:
     """Обновление токенов авторизации в куках."""
 
     access_token = security.refresh(session, refresh_token)
@@ -75,6 +77,8 @@ def refresh(
         samesite="none",
         secure=True
     )
+
+    return schema.Tokens(access_token=access_token)
 
 @router.post('/logout', status_code=status.HTTP_200_OK)
 def logout(
@@ -103,9 +107,14 @@ def update(
     if not security.update(session, username, payload):
         raise ForbiddenHTTPException("Не удалось обновить данные пользователя. Проверьте пароль.")
 
+@router.get('/sessions', response_model=list[schema.UserSession])
+def sessions(session: depends.Session, username: depends.Username):
+    return security.sessions(session, username)
+
 from typing import Annotated
 from fastapi import Body, status
 from pydantic import TypeAdapter, ValidationError
+
 
 @router.post('/recover', status_code=status.HTTP_200_OK)
 def recover(

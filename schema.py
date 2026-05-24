@@ -33,6 +33,7 @@ QuestionType = Literal['select', 'multiselect', 'input']
 ConnectionState = Literal['connected', 'disconnected', 'banned']
 Tag = Annotated[str, StringConstraints(strip_whitespace=True, max_length=32, pattern=r'^#\w+(?:_\w+)*$')]
 RoomPrivacy = Literal['public', 'private']
+UserSession = tuple[RefreshToken, Device, DateTime, Count]
 
 def format_datetime(datetime: datetime) -> DateTime:
     return datetime.strftime('%Y-%m-%d %H:%M:%S')
@@ -46,6 +47,11 @@ class Configuration(BaseModel):
     auth_expiration: Count
     image_size_limit: Count
     quiz_size_limit: Count
+
+
+class Tokens(BaseModel):
+    access_token: AccessToken
+    refresh_token: RefreshToken | None = None
 
 
 class UserProfile(BaseModel):
@@ -89,10 +95,6 @@ class UserCredentialsUpdate(BaseModel):
     new_email: Email | None = None
 
 
-class UserDevices(BaseModel):
-    devices: list[Device, int]
-
-
 class Question(BaseModel):
     score: Count
     text: Text
@@ -105,7 +107,7 @@ class Question(BaseModel):
 
 
 class Answer(BaseModel):
-    asnwer: Text |  set[Index] | Index
+    asnwer: Text | set[Index] | Index
 
 
 class QuizPreview(BaseModel):
