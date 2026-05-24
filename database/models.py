@@ -35,7 +35,7 @@ class User(Base):
 
     quizzes: Mapped[list["Quiz"]] = relationship(
         secondary=user_quiz, 
-        back_populates="users"
+        back_populates="authors"
     )
 
     __table_args__ = (
