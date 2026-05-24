@@ -26,7 +26,6 @@ user_achievement = Table(
     Column('id', Integer, primary_key=True, autoincrement=True),
     Column('username', String(32), ForeignKey('users.username', ondelete='CASCADE', onupdate='CASCADE'), nullable=False),
     Column('achievement_id', Integer, ForeignKey('achievements.id', ondelete='CASCADE'), nullable=False),
-    Column('creation_time', String(32), nullable=False),
     UniqueConstraint('username', 'achievement_id', name='user_achievement_unique')
 )
 

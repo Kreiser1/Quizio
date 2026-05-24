@@ -26,6 +26,7 @@ Count = Annotated[int, Field(ge=0)]
 AccessToken = Annotated[str, StringConstraints(pattern=r'^[A-Za-z0-9-_=]+\.[A-Za-z0-9-_=]+\.?[A-Za-z0-9-_.+/=]*$')]
 RecoveryToken = Annotated[str, StringConstraints(pattern=r'^[A-Za-z0-9-_=]+\.[A-Za-z0-9-_=]+\.?[A-Za-z0-9-_.+/=]*$')]
 RefreshToken = Annotated[str, StringConstraints(max_length=256, pattern=r'^(?:[0-9a-fA-F]{2})+$')]
+RoomToken = Annotated[str, StringConstraints(max_length=32, strip_whitespace=True, pattern=r'^(?:[0-9a-fA-F]{2})+$')]
 Role = Literal['user', 'moderator', 'administrator']
 DateTime = Annotated[str, StringConstraints(pattern=r'^\d{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\d|3[01]) (?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d$')]
 FullName = Annotated[str, StringConstraints(min_length=2, max_length=128, strip_whitespace=True, pattern=r'^[a-zA-Zа-яА-ЯёЁ]+(?:-[a-zA-Zа-яА-ЯёЁ]+)?(?:\s+[a-zA-Zа-яА-ЯёЁ]+(?:-[a-zA-Zа-яА-ЯёЁ]+)?){0,2}$')]
@@ -108,7 +109,7 @@ class Question(BaseModel):
 
 class Answer(BaseModel):
     question: Index
-    asnwer: Text | set[Index] | Index
+    answer: Text | set[Index] | Index
 
 
 class QuizPreview(BaseModel):
@@ -169,7 +170,7 @@ class RoomUser(BaseModel):
 class RoomTeam(BaseModel):
     title: Title | None = None
     color: Color
-    users: list[RoomUser]
+    users: set[RoomUser]
 
     @computed_field
     def users_count(self) -> Count:
@@ -180,10 +181,24 @@ class RoomTeam(BaseModel):
         return sum(map(lambda user: user.score, self.users))
     
 
+class RoomCreate(BaseModel):
+    title: Title | None = None
+    teams: set[RoomTeam]
+    privacy: RoomPrivacy
+    quiz_id: Index
+
+
+class RoomUpdate(BaseModel):
+    title: Title | None = None
+    teams: set[RoomTeam]
+    privacy: RoomPrivacy
+    quiz_id: Index
+
+
 class Room(BaseModel):
     title: Title | None = None
-    users: list[RoomUser]
-    teams: list[RoomTeam]
+    users: set[RoomUser]
+    teams: set[RoomTeam]
     privacy: RoomPrivacy
     quiz: Quiz
     current_question: Index
@@ -204,17 +219,16 @@ class Achievement(BaseModel):
     title: Title
     icon: Base64 | Index = 0
     condition: Code
-    creation_time: DateTime
 
 
     class AchievementsYaml(BaseModel):
-        achievements: list[AchievementCreate]
+        achievements: list[Achievement]
 
 
     @classmethod
-    def from_yaml(cls, text: str) -> list[AchievementCreate]:
+    def from_yaml(cls, text: str) -> list[Achievement]:
         return cls.AchievementsYaml.model_validate(yaml.safe_load(text)).achievements
 
     @classmethod
-    def to_yaml(cls, achievements: list[AchievementCreate]) -> str:
+    def to_yaml(cls, achievements: list[Achievement]) -> str:
         return yaml.safe_dump(cls.AchievementsYaml(achievements=achievements).model_dump(mode='json'), sort_keys=False, allow_unicode=True)

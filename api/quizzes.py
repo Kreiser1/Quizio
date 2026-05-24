@@ -194,7 +194,7 @@ def download_quiz_yaml(
     if not quiz:
         raise NotFoundHTTPException("Викторина не найдена.")
 
-    file_like = io.BytesIO(schema.Quiz.to_yaml(quiz.questions))
+    file_like = io.BytesIO(schema.Quiz.to_yaml(quiz.questions).encode('utf-8'))
     filename = f"quiz_{id}.yaml"
 
     return StreamingResponse(

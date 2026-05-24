@@ -32,13 +32,10 @@ def award_achievement(session: db.Session, username: schema.Username, id: schema
     if not user_exists or not achi_exists:
         return False
 
-    creation_time = schema.format_datetime(datetime.now())
-
     try:
         session.execute(db.insert(db.user_achievement).values(
             username=username,
-            achievement_id=id,
-            creation_time=creation_time
+            achievement_id=id
         ))
         session.flush()
         return True
@@ -52,8 +49,7 @@ def get_user_achievements(session: db.Session, username: schema.Username) -> lis
     achievements = session.execute(db.select(
             db.Achievement.id,
             db.Achievement.title,
-            db.Achievement.icon,
-            db.user_achievement.c.creation_time
+            db.Achievement.icon
         )
         .join(db.user_achievement, db.Achievement.id == db.user_achievement.c.achievement_id)
         .where(db.user_achievement.c.username == username)).all()
@@ -63,24 +59,25 @@ def get_user_achievements(session: db.Session, username: schema.Username) -> lis
             id=achievement[0],
             title=achievement[1],
             icon=achievement[2],
-            condition='',
-            cre=achievement[3]
+            condition=''
         )
         for achievement in achievements
     ]
 
-def get_achievements(session: db.Session) -> list[schema.AchievementCreate]:
+def get_achievements(session: db.Session) -> list[schema.Achievement]:
     achievements = session.execute(db.select(
+        db.Achievement.id,
         db.Achievement.title,
         db.Achievement.icon,
         db.Achievement.condition
     )).all()
     
     return [
-        schema.AchievementCreate(
-            title=achievement[0],
-            icon=achievement[1],
-            condition=achievement[2]
+        schema.Achievement(
+            id=achievement[0],
+            title=achievement[1],
+            icon=achievement[2],
+            condition=achievement[3]
         )
         for achievement in achievements
     ]

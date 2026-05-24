@@ -56,16 +56,11 @@ def download_achievements_yaml(
     if not achievements:
         raise NotFoundHTTPException("Список достижений пуст.")
 
-    try:
-        yaml_text = schema.Achievement.to_yaml(achievements)
-    except schema.YAMLError:
-        raise UnprocessableHTTPException("Не удалось сгенерировать YAML.")
-
-    file_like = io.BytesIO(yaml_text)
+    file_like = io.BytesIO(schema.Achievement.to_yaml(achievements).encode('utf-8'))
     filename = "achievements.yaml"
 
     return StreamingResponse(
-        file_like, 
+        schema.Achievement.to_yaml(achievements), 
         media_type='application/x-yaml',
         headers={
             'Content-Disposition': f'attachment; filename="{filename}"'

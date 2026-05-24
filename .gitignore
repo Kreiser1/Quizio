@@ -2,3 +2,4 @@ config.env
 database.db
 __pycache__
 venv
+gamesvc.py
