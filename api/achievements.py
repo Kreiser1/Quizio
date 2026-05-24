@@ -1,0 +1,91 @@
+from typing import Annotated
+from fastapi import APIRouter, status, Path, Depends, Body
+from fastapi.responses import StreamingResponse
+import io
+
+import schema
+import depends
+import achisvc
+from exceptions import *
+
+
+router = APIRouter(prefix='/achievements', tags=['Достижения'])
+
+@router.post('', response_model=schema.Achievement, status_code=status.HTTP_201_CREATED)
+def create_achievement(
+    session: depends.Session,
+    moderator: depends.Moderator,
+    payload: schema.AchievementCreate = Body(...)
+) -> schema.Achievement:
+    """Создать новое достижение."""
+    
+    try:
+        compile(payload.condition, "<string>", "eval")
+    except SyntaxError:
+        raise UnprocessableHTTPException("Некорректный синтаксис в условии достижения.")
+
+    achievement = achisvc.create_achievement(session, payload)
+
+    if not achievement:
+        raise ConflictHTTPException("Не удалось создать достижение.")
+        
+    return achievement
+
+@router.delete('/{id}', status_code=status.HTTP_200_OK)
+def delete_achievement(
+    session: depends.Session,
+    moderator: depends.Moderator,
+    id: schema.Index = Path(...)
+):
+    """Удалить достижение."""
+
+    success = achisvc.delete_achievement(session, id)
+
+    if not success:
+        raise NotFoundHTTPException("Достижение не найдено.")
+
+@router.get('/yaml', status_code=status.HTTP_200_OK)
+def download_achievements_yaml(
+    session: depends.Session,
+    moderator: depends.Moderator
+):
+    """Скачать .yaml всех достижений."""
+
+    achievements = achisvc.get_achievements(session)
+    
+    if not achievements:
+        raise NotFoundHTTPException("Список достижений пуст.")
+
+    try:
+        yaml_text = schema.Achievement.to_yaml(achievements)
+    except schema.YAMLError:
+        raise UnprocessableHTTPException("Не удалось сгенерировать YAML.")
+
+    file_like = io.BytesIO(yaml_text)
+    filename = "achievements.yaml"
+
+    return StreamingResponse(
+        file_like, 
+        media_type='application/x-yaml',
+        headers={
+            'Content-Disposition': f'attachment; filename="{filename}"'
+        }
+    )
+
+@router.get('', response_model=list[schema.AchievementCreate], status_code=status.HTTP_200_OK)
+def get_my_achievements(
+    session: depends.Session,
+    username: depends.Username
+) -> list[schema.AchievementCreate]:
+    """Получить список всех достижений текущего пользователя."""
+    
+    user_achievements = achisvc.get_user_achievements(session, username)
+        
+    return [
+        schema.AchievementCreate(
+            title=achievement.title,
+            icon=achievement.icon,
+            condition=''
+        )
+        for achievement in user_achievements
+    ]

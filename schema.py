@@ -107,6 +107,7 @@ class Question(BaseModel):
 
 
 class Answer(BaseModel):
+    question: Index
     asnwer: Text | set[Index] | Index
 
 
@@ -161,7 +162,6 @@ class RoomUser(BaseModel):
     connection_state: ConnectionState
     score: Count
     answers_streak: Count
-    answers_count: Count
     answers_total: Count
     answers_correct: Count
 
@@ -183,9 +183,38 @@ class RoomTeam(BaseModel):
 class Room(BaseModel):
     title: Title | None = None
     users: list[RoomUser]
+    teams: list[RoomTeam]
     privacy: RoomPrivacy
     quiz: Quiz
+    current_question: Index
 
     @computed_field
     def users_count(self) -> Count:
         return len(self.users)
+    
+
+class AchievementCreate(BaseModel):
+    title: Title
+    icon: Base64 | Index = 0
+    condition: Code
+
+
+class Achievement(BaseModel):
+    id: Index
+    title: Title
+    icon: Base64 | Index = 0
+    condition: Code
+    creation_time: DateTime
+
+
+    class AchievementsYaml(BaseModel):
+        achievements: list[AchievementCreate]
+
+
+    @classmethod
+    def from_yaml(cls, text: str) -> list[AchievementCreate]:
+        return cls.AchievementsYaml.model_validate(yaml.safe_load(text)).achievements
+
+    @classmethod
+    def to_yaml(cls, achievements: list[AchievementCreate]) -> str:
+        return yaml.safe_dump(cls.AchievementsYaml(achievements=achievements).model_dump(mode='json'), sort_keys=False, allow_unicode=True)

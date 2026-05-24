@@ -7,7 +7,7 @@ user_quiz = Table(
     Base.metadata,
     Column('id', Integer, primary_key=True, autoincrement=True),
     Column('username', String(32), ForeignKey('users.username', ondelete='CASCADE', onupdate='CASCADE'), nullable=False),
-    Column('quiz_id', Integer, ForeignKey('quizzes.id', ondelete='CASCADE')),
+    Column('quiz_id', Integer, ForeignKey('quizzes.id', ondelete='CASCADE'), nullable=False),
     UniqueConstraint('username', 'quiz_id', name='user_quiz_unique')
 )
 
@@ -16,8 +16,18 @@ tag_quiz = Table(
     Base.metadata,
     Column('id', Integer, primary_key=True, autoincrement=True),
     Column('tag', String(32), nullable=False),
-    Column('quiz_id', Integer, ForeignKey('quizzes.id', ondelete='CASCADE')),
+    Column('quiz_id', Integer, ForeignKey('quizzes.id', ondelete='CASCADE'), nullable=False),
     UniqueConstraint('tag', 'quiz_id', name='tag_quiz_unique')
+)
+
+user_achievement = Table(
+    'user_achievement',
+    Base.metadata,
+    Column('id', Integer, primary_key=True, autoincrement=True),
+    Column('username', String(32), ForeignKey('users.username', ondelete='CASCADE', onupdate='CASCADE'), nullable=False),
+    Column('achievement_id', Integer, ForeignKey('achievements.id', ondelete='CASCADE'), nullable=False),
+    Column('creation_time', String(32), nullable=False),
+    UniqueConstraint('username', 'achievement_id', name='user_achievement_unique')
 )
 
 
@@ -36,6 +46,11 @@ class User(Base):
     quizzes: Mapped[list["Quiz"]] = relationship(
         secondary=user_quiz, 
         back_populates="authors"
+    )
+
+    achievements: Mapped[list["Achievement"]] = relationship(
+        secondary=user_achievement,
+        back_populates='users'
     )
 
     __table_args__ = (
@@ -79,3 +94,17 @@ class Auth(Base):
     creation_time: Mapped[str] = mapped_column(String(32), nullable=False)
     expiration_time: Mapped[int] = mapped_column(BigInteger, nullable=False)
     device: Mapped[str] = mapped_column(String(128), nullable=True)
+
+
+class Achievement(Base):
+    __tablename__ = 'achievements'
+    
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    title: Mapped[str] = mapped_column(String(128), nullable=False)
+    icon: Mapped[str] = mapped_column(Text(), default='0')
+    condition: Mapped[str] = mapped_column(Text, nullable=False)
+
+    users: Mapped[list["User"]] = relationship(
+        secondary=user_achievement,
+        back_populates='achievements'
+    )
