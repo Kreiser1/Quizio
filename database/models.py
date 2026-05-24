@@ -65,7 +65,7 @@ class Quiz(Base):
     def questions(self, value: list[schema.Question]):
         self.yaml = schema.Quiz.to_yaml(value)
 
-    users: Mapped[list["User"]] = relationship(
+    authors: Mapped[list["User"]] = relationship(
         secondary=user_quiz, 
         back_populates="quizzes"
     )

@@ -101,14 +101,30 @@ class Answer(BaseModel):
     asnwer: Text |  set[Index] | Index
 
 
+class QuizPreview(BaseModel):
+    id: Index
+    title: Title
+    icon: Base64 | Index = 0
+    creation_time: DateTime
+    tags: set[Tag] | None = None
+
+
+class QuizCreate(BaseModel):
+    title: Title
+    icon: Base64 | Index = 0
+    author: Username
+    questions: list[Question]
+    tags: set[Tag] | None = None
+
 class Quiz(BaseModel):
+    id: Index
     title: Title
     icon: Base64 | Index = 0
     questions: list[Question]
     creation_time: DateTime
     edit_time: DateTime | None = None
     last_edit_username: Username | None = None
-    tags: list[Tag] | None
+    tags: set[Tag] | None = None
 
     @computed_field
     def questions_count(self) -> Count:
