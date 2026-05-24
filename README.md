@@ -16,6 +16,18 @@ venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
+_Необходимо создать и заполнить файл **config.env**_
+
+```
+DATABASE_URI='sqlite:///./database.db'
+TOKEN_SECRET=<hex-string>
+AUTH_SECRET=<hex-string>
+AUTH_COST=65536
+AUTH_COOLDOWN=10
+TOKEN_EXPIRATION=600
+ADMIN_PASSWORD=<password>
+```
+
 Команда для обновления:
 
 ```

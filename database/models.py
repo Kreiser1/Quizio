@@ -1,4 +1,4 @@
-from . import Base, Mapped, exists, relationship, CheckConstraint, mapped_column, String, Integer, Text, UniqueConstraint, Table, Column, Optional, ForeignKey, session
+from . import Base, Mapped, exists, relationship, CheckConstraint, mapped_column, String, Integer, Text, UniqueConstraint, Table, Column, Optional, ForeignKey, session, BigInteger
 import schema, security, config
 
 
@@ -71,10 +71,11 @@ class Quiz(Base):
     )
 
 
-class Token(Base):
-    __tablename__ = 'tokens'
+class Auth(Base):
+    __tablename__ = 'auth'
 
-    token: Mapped[str] = mapped_column(String(128), primary_key=True)
+    refresh_token: Mapped[str] = mapped_column(String(128), primary_key=True)
     username: Mapped[str] = mapped_column(String(32), nullable=False)
     creation_time: Mapped[str] = mapped_column(String(32), nullable=False)
+    expiration_time: Mapped[int] = mapped_column(BigInteger, nullable=False)
     device: Mapped[str] = mapped_column(String(128), nullable=True)

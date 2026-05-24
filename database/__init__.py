@@ -1,13 +1,12 @@
 import sqlite3
 
-from sqlalchemy import create_engine, exists
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship, sessionmaker, Session as _Session
-from sqlalchemy import String, Text, UniqueConstraint, CheckConstraint, Integer, Table, Column, ForeignKey
+from sqlalchemy import create_engine, exists, select, update, delete
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship, sessionmaker, Session
+from sqlalchemy import String, Text, UniqueConstraint, CheckConstraint, Integer, Table, Column, ForeignKey, BigInteger
 from sqlalchemy.exc import IntegrityError
 from typing import Optional
 from config import DATABASE_URI
 from collections.abc import Generator
-from contextlib import contextmanager
 
 
 class Base(DeclarativeBase):
@@ -15,16 +14,29 @@ class Base(DeclarativeBase):
 
 
 engine = create_engine(DATABASE_URI)
-Session = sessionmaker(
+_Session = sessionmaker(
     bind=engine,
     autocommit=False, 
     autoflush=False,
     expire_on_commit=True
 )
 
+def session() -> Generator[Session, None, None]:
+    with _Session() as session:
+        try:
+            yield session
+            session.commit()
+        except Exception:
+            session.rollback()
+            raise
+        finally:
+            session.close()
+
+from contextlib import contextmanager
+
 @contextmanager
-def session() -> Generator[_Session, None, None]:
-    with Session() as session:
+def connect() -> Generator[Session, None, None]:
+    with _Session() as session:
         try:
             yield session
             session.commit()
