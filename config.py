@@ -14,6 +14,7 @@ AUTH_COST = int(_config.get('AUTH_COST') or 65536)
 AUTH_COOLDOWN = int(_config.get('AUTH_COOLDOWN') or 10)
 IMAGE_SIZE_LIMIT = int(_config.get('IMAGE_SIZE_LIMIT') or 2097152)
 QUIZ_SIZE_LIMIT = int(_config.get('QUIZ_SIZE_LIMIT') or 8388608)
+FREQUENCY = float(_config.get('FREQUENCY') or 4.0)
 DEBUG = _config.get('DEBUG').lower() == 'true'
 
 if not TOKEN_SECRET or not AUTH_SECRET:
@@ -22,4 +23,8 @@ if not TOKEN_SECRET or not AUTH_SECRET:
 
 if not ADMIN_USERNAME or not ADMIN_PASSWORD:
     logging.error("Initial admin username or password is not specified in config.env")
+    sys.exit(1)
+
+if IMAGE_SIZE_LIMIT <= 0 or QUIZ_SIZE_LIMIT <= 0 or FREQUENCY <= 0:
+    logging.error("Initial size limits or frequency in config.env")
     sys.exit(1)

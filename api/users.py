@@ -17,9 +17,8 @@ def update_profile(session: depends.Session, username: depends.Username, payload
 
     if isinstance(payload.avatar, schema.Base64) and len(payload.avatar) > config.IMAGE_SIZE_LIMIT:
         raise UnprocessableHTTPException("Аватар слишком большой.")
-    else:
-        if int(payload.avatar) > 1048576:
-            raise UnprocessableHTTPException("Неверный аватар.")
+    elif payload.avatar > 1048576:
+        raise UnprocessableHTTPException("Неверный аватар.")
 
     if not usersvc.update_profile(session, username, payload):
         raise NotFoundHTTPException("Не удалось обновить данные пользователя.")

@@ -98,7 +98,7 @@ def authorize(session: db.Session, user_authorization_payload: schema.UserAuthor
         return (refresh_token, encode({
             'username': user_authorization_payload.username,
             'refresh_token': refresh_token,
-            'expiration_time': int(time() + 600)
+            'expiration_time': time() + 600
         }))
     except db.IntegrityError:
         return None
@@ -156,7 +156,7 @@ def refresh(session: db.Session, refresh_token: schema.RefreshToken) -> schema.A
     return encode({
         'username': username,
         'refresh_token': refresh_token,
-        'expiration_time': int(time() + 600)
+        'expiration_time': time() + 600
     })
 
 recovery = {}
@@ -193,7 +193,7 @@ def initiate_recover(session: db.Session, user_recovery_payload: schema.UserReco
     recovery[recovery_token] = {
         'username': user_recovery_payload.username,
         'new_password': token_hex(16),
-        'expiration_time': int(time() + 900)
+        'expiration_time': time() + 900
     }
 
     return recovery_token

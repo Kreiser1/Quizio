@@ -31,5 +31,8 @@ def update_profile(session: db.Session, username: schema.Username, user_update_p
 
     return session.execute(db.update(db.User).where(db.User.username == username).values(**params)).rowcount > 0
 
+def update_role(session: db.Session, user_role_update_payload: schema.UserRoleUpdate) -> bool:
+    return session.execute(db.update(db.User).where(db.User.username == user_role_update_payload.username).values(role=user_role_update_payload.role)).rowcount > 0
+
 def delete_profile(session: db.Session, username: schema.Username) -> bool:
     return session.execute(db.delete(db.User).where(db.User.username == username)).rowcount > 0

@@ -13,7 +13,8 @@ def configuration() -> Configuration:
         auth_cooldown=config.AUTH_COOLDOWN,
         auth_expiration=config.AUTH_EXPIRATION,
         image_size_limit=config.IMAGE_SIZE_LIMIT,
-        quiz_size_limit=config.QUIZ_SIZE_LIMIT
+        quiz_size_limit=config.QUIZ_SIZE_LIMIT,
+        frequency=config.FREQUENCY
     )
 
 package_dir = Path(__file__).resolve().parent

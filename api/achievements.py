@@ -6,6 +6,7 @@ import io
 import schema
 import depends
 import achisvc
+import config
 from exceptions import *
 
 
@@ -19,10 +20,17 @@ def create_achievement(
 ) -> schema.Achievement:
     """Создать новое достижение."""
     
+    if isinstance(payload.icon, schema.Base64):
+        if len(payload.icon) > config.IMAGE_SIZE_LIMIT:
+            raise UnprocessableHTTPException("Иконка слишком большая.")
+    elif payload.icon > 1048576:
+        raise UnprocessableHTTPException("Неверная иконка.")
+
     try:
         compile(payload.condition, "<string>", "eval")
     except SyntaxError:
         raise UnprocessableHTTPException("Некорректный синтаксис в условии достижения.")
+    
 
     achievement = achisvc.create_achievement(session, payload)
 

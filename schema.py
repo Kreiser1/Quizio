@@ -23,6 +23,7 @@ Base64 = Annotated[str, StringConstraints(pattern=r'^(?:[A-Za-z0-9+/]{4})*(?:[A-
 Email = Annotated[str, StringConstraints(min_length=5, max_length=254, strip_whitespace=True, to_lower=True, pattern=r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$')]
 Index = Annotated[int, Field(ge=0)]
 Count = Annotated[int, Field(ge=0)]
+Time = Annotated[float, Field(ge=0)]
 AccessToken = Annotated[str, StringConstraints(pattern=r'^[A-Za-z0-9-_=]+\.[A-Za-z0-9-_=]+\.?[A-Za-z0-9-_.+/=]*$')]
 RecoveryToken = Annotated[str, StringConstraints(pattern=r'^[A-Za-z0-9-_=]+\.[A-Za-z0-9-_=]+\.?[A-Za-z0-9-_.+/=]*$')]
 RefreshToken = Annotated[str, StringConstraints(max_length=256, pattern=r'^(?:[0-9a-fA-F]{2})+$')]
@@ -31,7 +32,6 @@ Role = Literal['user', 'moderator', 'administrator']
 DateTime = Annotated[str, StringConstraints(pattern=r'^\d{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\d|3[01]) (?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d$')]
 FullName = Annotated[str, StringConstraints(min_length=2, max_length=128, strip_whitespace=True, pattern=r'^[a-zA-Zа-яА-ЯёЁ]+(?:-[a-zA-Zа-яА-ЯёЁ]+)?(?:\s+[a-zA-Zа-яА-ЯёЁ]+(?:-[a-zA-Zа-яА-ЯёЁ]+)?){0,2}$')]
 QuestionType = Literal['select', 'multiselect', 'input']
-ConnectionState = Literal['connected', 'disconnected', 'banned']
 Tag = Annotated[str, StringConstraints(strip_whitespace=True, max_length=32, pattern=r'^#\w+(?:_\w+)*$')]
 RoomPrivacy = Literal['public', 'private']
 UserSession = tuple[RefreshToken, Device, DateTime, Count]
@@ -48,6 +48,7 @@ class Configuration(BaseModel):
     auth_expiration: Count
     image_size_limit: Count
     quiz_size_limit: Count
+    frequency: Time
 
 
 class Tokens(BaseModel):
@@ -104,7 +105,7 @@ class Question(BaseModel):
     code: Code | None = None
     type: QuestionType | None
     answer: Text | set[Index] | Index | None
-    time: int | None = None
+    time: Time | None = None
 
 
 class Answer(BaseModel):
@@ -160,11 +161,26 @@ class Quiz(BaseModel):
 
 class RoomUser(BaseModel):
     username: Username
-    connection_state: ConnectionState
+    connection_state: Literal['connected', 'disconnected', 'banned']
     score: Count
     answers_streak: Count
-    answers_total: Count
-    answers_correct: Count
+    answers: set[tuple[Index, bool]]
+
+    @computed_field
+    def answers_count(self) -> Count:
+        return len(self.answers)
+    
+    @computed_field
+    def correct_answers_count(self) -> Count:
+        return sum(tuple(map(lambda answer: 1 if answer[1] else 0, self.answers)))
+    
+    def __hash__(self):
+        return hash(self.username)
+
+    def __eq__(self, other):
+        if not isinstance(other, RoomUser):
+            return False
+        return self.username == other.username
 
 
 class RoomTeam(BaseModel):
@@ -180,32 +196,72 @@ class RoomTeam(BaseModel):
     def score(self) -> Count:
         return sum(map(lambda user: user.score, self.users))
     
+    def __hash__(self):
+        return hash((self.title, self.color))
+
+    def __eq__(self, other):
+        if not isinstance(other, RoomTeam):
+            return False
+        return self.title == other.title and self.color == other.color
 
 class RoomCreate(BaseModel):
-    title: Title | None = None
+    title: Title
     teams: set[RoomTeam]
     privacy: RoomPrivacy
     quiz_id: Index
 
 
-class RoomUpdate(BaseModel):
-    title: Title | None = None
-    teams: set[RoomTeam]
-    privacy: RoomPrivacy
-    quiz_id: Index
-
-
-class Room(BaseModel):
-    title: Title | None = None
+class RoomPreview(BaseModel):
+    title: Title
+    owner: Username
     users: set[RoomUser]
     teams: set[RoomTeam]
     privacy: RoomPrivacy
-    quiz: Quiz
-    current_question: Index
+    quiz: QuizPreview
+    token: RoomToken
+
+
+class RoomStream(BaseModel):
+    title: Title
+    users: set[RoomUser]
+    teams: set[RoomTeam]
+    privacy: RoomPrivacy
+    current_question: Index | None
+    question_score: Count | None
+    question_text: Text | None
+    question_title: Title | None
+    question_image: Base64 | None
+    question_code: Code | None
+    question_type: QuestionType | None
+    question_time: Time | None = None
 
     @computed_field
     def users_count(self) -> Count:
         return len(self.users)
+    
+    @computed_field
+    def teams_count(self) -> Count:
+        return len(self.teams)
+
+
+class Room(BaseModel):
+    title: Title
+    owner: Username
+    users: set[RoomUser]
+    teams: set[RoomTeam]
+    privacy: RoomPrivacy
+    quiz: Quiz
+    current_question: Index | None
+    time: Time | None = None
+
+    @computed_field
+    def users_count(self) -> Count:
+        return len(self.users)
+    
+
+class RoomControl(BaseModel):
+    command: Literal['show', 'start', 'stop', 'end']
+    question: Index | None
     
 
 class AchievementCreate(BaseModel):
