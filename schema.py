@@ -206,7 +206,6 @@ class RoomTeam(BaseModel):
 
 class RoomCreate(BaseModel):
     title: Title
-    teams: set[RoomTeam]
     privacy: RoomPrivacy
     quiz_id: Index
 
@@ -214,11 +213,10 @@ class RoomCreate(BaseModel):
 class RoomPreview(BaseModel):
     title: Title
     owner: Username
-    users: set[RoomUser]
-    teams: set[RoomTeam]
+    users_count: Count
     privacy: RoomPrivacy
     quiz: QuizPreview
-    token: RoomToken
+    room_token: RoomToken
 
 
 class RoomStream(BaseModel):

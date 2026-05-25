@@ -24,7 +24,7 @@ def create_room(session: db.Session, username: schema.Username, payload: schema.
         title=payload.title,
         owner=username,
         users=set(),
-        teams=payload.teams,
+        teams=set(),
         privacy=payload.privacy,
         quiz=quiz,
         current_question=0
@@ -44,7 +44,6 @@ def update_room(session: db.Session, room_token: schema.RoomToken, payload: sche
     room.title = payload.title
     room.privacy = payload.privacy
     room.quiz = quiz
-    room.teams = payload.teams
     room.time = None
     room.current_question = 0
 
@@ -96,8 +95,8 @@ def search_rooms(query: schema.Title | None = None, count: schema.Count = 25, of
         rooms_found.append(schema.RoomPreview(
             title=room.title,
             owner=room.owner,
-            teams=room.teams,
-            token=token,
+            users_count=room.users_count,
+            room_token=token,
             privacy=room.privacy,
             quiz=schema.QuizPreview(
                 id=room.quiz.id,
@@ -150,7 +149,7 @@ def submit_answer(token: schema.RoomToken, username: schema.Username, payload: s
 
     return is_correct
 
-def control_room(room_token: schema.RoomToken, payload: schema.RoomControl) -> schema.RoomPreview | bool:
+def control_room(room_token: schema.RoomToken, payload: schema.RoomControl) -> bool:
     if room_token not in rooms:
         return False
 
@@ -175,24 +174,8 @@ def control_room(room_token: schema.RoomToken, payload: schema.RoomControl) -> s
         room.current_question = question
         room.time = None
     elif command == 'end':
-        room_last_frame = schema.RoomPreview(
-            title=room.title,
-            owner=room.owner,
-            teams=room.teams,
-            privacy=room.privacy,
-            quiz=schema.QuizPreview(
-                id=room.quiz.id,
-                title=room.quiz.title,
-                icon=room.quiz.icon,
-                creation_time=room.quiz.creation_time,
-                tags=room.quiz.tags
-            )
-        )
-
         if room_token in rooms:
             del rooms[room_token]
-
-        return room_last_frame
 
     return True
 

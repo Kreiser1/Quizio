@@ -12,10 +12,10 @@ from exceptions import *
 
 router = APIRouter(prefix='/rooms', tags=['Комнаты'])
 
-def _check_room_owner(token: schema.RoomToken, username: schema.Username, role: schema.Role) -> None:
-    if token not in roomsvc.rooms:
+def _check_room_owner(room_token: schema.RoomToken, username: schema.Username, role: schema.Role) -> None:
+    if room_token not in roomsvc.rooms:
         raise NotFoundHTTPException("Игровая комната не найдена.")
-    if roomsvc.rooms[token].owner != username and role != 'administrator':
+    if roomsvc.rooms[room_token].owner != username and role != 'administrator':
         raise ForbiddenHTTPException("У вас нет прав для управления этой комнатой.")
 
 def _mask_room_stream(stream: schema.RoomStream, current_username: schema.Username | None) -> schema.RoomStream:
@@ -46,18 +46,18 @@ def create_room(
     
     return room_token
 
-@router.put('/{token}', status_code=status.HTTP_200_OK)
+@router.put('/{room_token}', status_code=status.HTTP_200_OK)
 def update_room(
     session: depends.Session,
     moderator: depends.Moderator,
     username: depends.Username,
     role: depends.Role,
-    token: schema.RoomToken = Path(...),
+    room_token: schema.RoomToken = Path(...),
     payload: schema.RoomCreate = Body(...)
 ):
-    _check_room_owner(token, username, role)
+    _check_room_owner(room_token, username, role)
     
-    if not roomsvc.update_room(session, token, payload):
+    if not roomsvc.update_room(session, room_token, payload):
         raise ConflictHTTPException("Не удалось обновить комнату.")
 
 @router.get('/query', response_model=list[schema.RoomPreview], status_code=status.HTTP_200_OK)
@@ -69,97 +69,94 @@ def search_rooms(
 ) -> list[schema.RoomPreview]:
     return roomsvc.search_rooms(query=query, count=count, offset=offset)
 
-@router.get('/{token}', status_code=status.HTTP_200_OK)
+@router.get('/{room_token}', status_code=status.HTTP_200_OK)
 def join_room(
     username: depends.Username,
-    token: schema.RoomToken = Path(...)
+    room_token: schema.RoomToken = Path(...)
 ):
-    if not roomsvc.join_room(token, username):
+    if not roomsvc.join_room(room_token, username):
         raise ForbiddenHTTPException("Вы забанены или комната не существует.")
 
-@router.post('/{token}/answer', status_code=status.HTTP_200_OK)
+@router.post('/{room_token}/answer', status_code=status.HTTP_200_OK)
 def post_answer(
     username: depends.Username,
-    token: schema.RoomToken = Path(...),
+    room_token: schema.RoomToken = Path(...),
     payload: schema.Answer = Body(...)
 ) -> bool:
-    return roomsvc.submit_answer(token, username, payload)
+    return roomsvc.submit_answer(room_token, username, payload)
 
-@router.post('/{token}/control', status_code=status.HTTP_200_OK)
+@router.post('/{room_token}/control', status_code=status.HTTP_200_OK)
 def control_room(
     moderator: depends.Moderator,
     username: depends.Username,
     role: depends.Role,
-    token: schema.RoomToken = Path(...),
+    room_token: schema.RoomToken = Path(...),
     payload: schema.RoomControl = Body(...)
-) -> schema.RoomPreview | None:
-    _check_room_owner(token, username, role)
+):
+    _check_room_owner(room_token, username, role)
 
-    result = roomsvc.control_room(token, payload)
+    result = roomsvc.control_room(room_token, payload)
     
     if not result:
         raise UnprocessableHTTPException("Неверная команда или индекс вопроса.")
-        
-    if isinstance(result, schema.RoomPreview):
-        return result
 
-@router.post('/{token}/ban', status_code=status.HTTP_200_OK)
+@router.post('/{room_token}/ban', status_code=status.HTTP_200_OK)
 def ban_user(
     moderator: depends.Moderator, username: depends.Username, role: depends.Role,
-    token: schema.RoomToken = Path(...), target_user: schema.Username = Body(embed=True)
+    room_token: schema.RoomToken = Path(...), target_user: schema.Username = Body(embed=True)
 ):
-    _check_room_owner(token, username, role)
+    _check_room_owner(room_token, username, role)
 
-    if not roomsvc.ban_user(token, target_user):
+    if not roomsvc.ban_user(room_token, target_user):
         raise NotFoundHTTPException("Пользователь не найден.")
 
-@router.post('/{token}/unban', status_code=status.HTTP_200_OK)
+@router.post('/{room_token}/unban', status_code=status.HTTP_200_OK)
 def unban_user(
     moderator: depends.Moderator, username: depends.Username, role: depends.Role,
-    token: schema.RoomToken = Path(...), target_user: schema.Username = Body(embed=True)
+    room_token: schema.RoomToken = Path(...), target_user: schema.Username = Body(embed=True)
 ):
-    _check_room_owner(token, username, role)
+    _check_room_owner(room_token, username, role)
 
-    if not roomsvc.unban_user(token, target_user):
+    if not roomsvc.unban_user(room_token, target_user):
         raise NotFoundHTTPException("Пользователь не найден.")
 
-@router.post('/{token}/teams', status_code=status.HTTP_201_CREATED)
+@router.post('/{room_token}/teams', status_code=status.HTTP_201_CREATED)
 def add_team(
     moderator: depends.Moderator, username: depends.Username, role: depends.Role,
-    token: schema.RoomToken = Path(...), payload: schema.RoomTeam = Body(...)
+    room_token: schema.RoomToken = Path(...), payload: schema.RoomTeam = Body(...)
 ):
-    _check_room_owner(token, username, role)
+    _check_room_owner(room_token, username, role)
 
-    if not roomsvc.add_team(token, payload):
+    if not roomsvc.add_team(room_token, payload):
         raise ConflictHTTPException("Команда уже существует.")
 
-@router.delete('/{token}/teams/{title}', status_code=status.HTTP_200_OK)
+@router.delete('/{room_token}/teams/{title}', status_code=status.HTTP_200_OK)
 def delete_team(
     moderator: depends.Moderator, username: depends.Username, role: depends.Role,
-    token: schema.RoomToken = Path(...), title: schema.Title = Path(...)
+    room_token: schema.RoomToken = Path(...), title: schema.Title = Path(...)
 ):
-    _check_room_owner(token, username, role)
+    _check_room_owner(room_token, username, role)
 
-    if not roomsvc.delete_team(token, title):
+    if not roomsvc.delete_team(room_token, title):
         raise NotFoundHTTPException("Команда не найдена.")
 
-@router.post('/{token}/team', status_code=status.HTTP_200_OK)
+@router.post('/{room_token}/team', status_code=status.HTTP_200_OK)
 def set_user_team(
     moderator: depends.Moderator, current_username: depends.Username, role: depends.Role,
-    token: schema.RoomToken = Path(...),
+    room_token: schema.RoomToken = Path(...),
     username: schema.Username = Body(...),
     team: schema.Title | None = Body(default=None)
 ):
-    _check_room_owner(token, current_username, role)
+    _check_room_owner(room_token, current_username, role)
 
-    if not roomsvc.set_user_team(token, username, team):
+    if not roomsvc.set_user_team(room_token, username, team):
         raise NotFoundHTTPException("Не удалось обновить команду пользователя.")
 
 
 from security import decode
 
 
-@router.websocket('/{token}/stream')
+@router.websocket('/{room_token}/stream')
 async def room_stream(
     websocket: WebSocket,
     room_token: schema.RoomToken = Path(...)
@@ -183,6 +180,7 @@ async def room_stream(
     if username:
         if not roomsvc.join_room(room_token, username):
             await websocket.close()
+            print('Room join failed.')
             return
         
         if room_token in roomsvc.rooms:
@@ -191,6 +189,7 @@ async def room_stream(
                 user.connection_state = 'connected'
     else:
         if room_token not in roomsvc.rooms:
+            print('Room token failed.')
             await websocket.close()
             return
 
@@ -211,7 +210,7 @@ async def room_stream(
             except ValidationError as e:
                 await websocket.send_json({})
                 
-            await asyncio.sleep(config.FREQUENCY)
+            await asyncio.sleep(1.0 / config.FREQUENCY)
             
     except WebSocketDisconnect:
         if username and room_token in roomsvc.rooms:
