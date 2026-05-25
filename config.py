@@ -9,7 +9,8 @@ TOKEN_SECRET = _config.get('TOKEN_SECRET')
 AUTH_SECRET = _config.get('AUTH_SECRET')
 ADMIN_USERNAME =_config.get('ADMIN_USERNAME')
 ADMIN_PASSWORD =_config.get('ADMIN_PASSWORD')
-AUTH_EXPIRATION = int(_config.get('TOKEN_EXPIRATION') or 1209600)
+AUTH_EXPIRATION = int(_config.get('AUTH_EXPIRATION') or 1209600)
+TOKEN_EXPIRATION = int(_config.get('TOKEN_EXPIRATION') or 600)
 AUTH_COST = int(_config.get('AUTH_COST') or 65536)
 AUTH_COOLDOWN = int(_config.get('AUTH_COOLDOWN') or 10)
 IMAGE_SIZE_LIMIT = int(_config.get('IMAGE_SIZE_LIMIT') or 2097152)
@@ -26,5 +27,9 @@ if not ADMIN_USERNAME or not ADMIN_PASSWORD:
     sys.exit(1)
 
 if IMAGE_SIZE_LIMIT <= 0 or QUIZ_SIZE_LIMIT <= 0 or FREQUENCY <= 0:
-    logging.error("Initial size limits or frequency in config.env")
+    logging.error("Invalid size limits or frequency in config.env")
+    sys.exit(1)
+
+if AUTH_EXPIRATION <= 0 or TOKEN_EXPIRATION <= 0 or AUTH_COOLDOWN <= 0:
+    logging.error("Invalid expiration times or cooldown in config.env")
     sys.exit(1)

@@ -20,7 +20,7 @@ def create_achievement(
 ) -> schema.Achievement:
     """Создать новое достижение."""
     
-    if isinstance(payload.icon, schema.Base64):
+    if isinstance(payload.icon, str):
         if len(payload.icon) > config.IMAGE_SIZE_LIMIT:
             raise UnprocessableHTTPException("Иконка слишком большая.")
     elif payload.icon > 1048576:

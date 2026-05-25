@@ -3,7 +3,7 @@ from pwdlib.hashers.argon2 import Argon2Hasher
 from secrets import token_hex
 from jwt import PyJWT, InvalidKeyError, InvalidTokenError
 from time import time
-from config import AUTH_SECRET, TOKEN_SECRET, AUTH_EXPIRATION, AUTH_COST
+from config import AUTH_SECRET, TOKEN_SECRET, AUTH_EXPIRATION, AUTH_COST, TOKEN_EXPIRATION
 import schema, database as db
 from datetime import datetime
 from user_agents import parse as parse_useragent
@@ -98,7 +98,7 @@ def authorize(session: db.Session, user_authorization_payload: schema.UserAuthor
         return (refresh_token, encode({
             'username': user_authorization_payload.username,
             'refresh_token': refresh_token,
-            'expiration_time': time() + 600
+            'expiration_time': int(time() + TOKEN_EXPIRATION)
         }))
     except db.IntegrityError:
         return None
@@ -128,10 +128,10 @@ def update(session: db.Session, username: schema.Username, user_credentials_upda
         password_hash = session.execute(db.select(db.User.password_hash).where(db.User.username == username)).scalar()
 
         if not password_hash:
-            return None
+            return False
         
         if not compare(user_credentials_update_payload.password, password_hash):
-            return None
+            return False
     
     params = {
         **({'email': encode({'email': user_credentials_update_payload.new_email})} if user_credentials_update_payload.new_email else {}),
@@ -139,7 +139,9 @@ def update(session: db.Session, username: schema.Username, user_credentials_upda
         **({'password_hash': hash(user_credentials_update_payload.new_password)} if user_credentials_update_payload.new_password else {})
     }
 
-    return session.execute(db.update(db.User).where(db.User.username == username).values(**params)).rowcount > 0
+    if session.execute(db.update(db.User).where(db.User.username == username).values(**params)).rowcount > 0:
+        session.execute(db.delete(db.Auth).where(db.Auth.username == username))
+        return True
     
 def refresh(session: db.Session, refresh_token: schema.RefreshToken) -> schema.AccessToken | None:
     auth = session.execute(db.select(db.Auth.username, db.Auth.expiration_time).where(db.Auth.refresh_token == refresh_token)).first()
@@ -156,7 +158,7 @@ def refresh(session: db.Session, refresh_token: schema.RefreshToken) -> schema.A
     return encode({
         'username': username,
         'refresh_token': refresh_token,
-        'expiration_time': time() + 600
+        'expiration_time': int(time() + TOKEN_EXPIRATION)
     })
 
 recovery = {}
@@ -193,7 +195,7 @@ def initiate_recover(session: db.Session, user_recovery_payload: schema.UserReco
     recovery[recovery_token] = {
         'username': user_recovery_payload.username,
         'new_password': token_hex(16),
-        'expiration_time': time() + 900
+        'expiration_time': int(time() + TOKEN_EXPIRATION)
     }
 
     return recovery_token

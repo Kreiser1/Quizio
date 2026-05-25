@@ -17,16 +17,26 @@ def create_quiz(
     session: depends.Session,
     moderator: depends.Moderator,
     username: depends.Username,
-    payload: schema.QuizCreate
+    payload: schema.QuizCreate | str = Body(...)
 ) -> schema.Quiz:
     """Создать новую викторину."""
-    yaml_text = schema.Quiz.to_yaml(payload.questions)
 
-    if len(yaml_text) > config.QUIZ_SIZE_LIMIT:
-        raise UnprocessableHTTPException("Превышен лимит размера квиза.")
+    if isinstance(payload, str):
+        if len(payload) > config.QUIZ_SIZE_LIMIT:
+            raise UnprocessableHTTPException("Размер квиза превышает лимит.")
+        
+        try:
+            payload = schema.QuizCreate(title=quiz.title, icon=quiz.icon, questions=schema.Quiz.from_yaml(payload), tags=quiz.tags)
+        except schema.YAMLError:
+            raise UnprocessableHTTPException("Некорректный формат YAML.")
+    else:
+        if isinstance(payload.icon, str) and len(payload.icon) > config.IMAGE_SIZE_LIMIT:
+            raise UnprocessableHTTPException("Иконка слишком большая.")
 
-    if isinstance(payload.icon, str) and len(payload.icon) > config.IMAGE_SIZE_LIMIT:
-        raise UnprocessableHTTPException("Иконка слишком большая.")
+        yaml_text = schema.Quiz.to_yaml(payload.questions)
+
+        if len(yaml_text) > config.QUIZ_SIZE_LIMIT:
+            raise UnprocessableHTTPException("Размер квиза превышает лимит.")
 
     quiz = quizsvc.create_quiz(session, username, payload)
 
@@ -89,13 +99,11 @@ def update_quiz(
             raise UnprocessableHTTPException("Размер квиза превышает лимит.")
         
         try:
-            questions = schema.Quiz.from_yaml(payload)
-            
-            payload = schema.QuizCreate(title=quiz.title, icon=quiz.icon, questions=questions, tags=quiz.tags)
+            payload = schema.QuizCreate(title=quiz.title, icon=quiz.icon, questions=schema.Quiz.from_yaml(payload), tags=quiz.tags)
         except schema.YAMLError:
             raise UnprocessableHTTPException("Некорректный формат YAML.")
     else:
-        if isinstance(payload.icon, schema.Base64) and len(payload.icon) > config.IMAGE_SIZE_LIMIT:
+        if isinstance(payload.icon, str) and len(payload.icon) > config.IMAGE_SIZE_LIMIT:
             raise UnprocessableHTTPException("Иконка слишком большая.")
 
         yaml_text = schema.Quiz.to_yaml(payload.questions)

@@ -195,7 +195,7 @@ async def room_stream(
 
     try:
         while True:
-            room_stream = roomsvc.refresh_room(room_token, delta_time=config.FREQUENCY)
+            room_stream = roomsvc.refresh_room(room_token, delta_time=1.0 / config.FREQUENCY)
 
             if not room_stream:
                 await websocket.send_json({})

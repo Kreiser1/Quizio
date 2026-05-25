@@ -19,16 +19,19 @@ pip install -r requirements.txt
 _Необходимо создать и заполнить файл **config.env**_
 
 ```
-DATABASE_URI='sqlite:///./database.db'
+DATABASE_URI=sqlite:///./database.db
 TOKEN_SECRET=<hex-string>
 AUTH_SECRET=<hex-string>
-AUTH_COST=65536
-TOKEN_EXPIRATION=1209600
 ADMIN_USERNAME=<username>
 ADMIN_PASSWORD=<password>
+AUTH_EXPIRATION=1209600
+TOKEN_EXPIRATION=600
+AUTH_COST=65536
+AUTH_COOLDOWN=10
 IMAGE_SIZE_LIMIT=2097152
 QUIZ_SIZE_LIMIT=8388608
-DEBUG=TRUE
+FREQUENCY=4.0
+DEBUG=FALSE
 ```
 
 Команда для обновления:

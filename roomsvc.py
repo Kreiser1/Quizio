@@ -27,7 +27,7 @@ def create_room(session: db.Session, username: schema.Username, payload: schema.
         teams=set(),
         privacy=payload.privacy,
         quiz=quiz,
-        current_question=0
+        current_question=None
     )
     return room_token
 
@@ -45,7 +45,7 @@ def update_room(session: db.Session, room_token: schema.RoomToken, payload: sche
     room.privacy = payload.privacy
     room.quiz = quiz
     room.time = None
-    room.current_question = 0
+    room.current_question = None
 
     for user in room.users:
         user.score = 0
@@ -122,6 +122,9 @@ def submit_answer(token: schema.RoomToken, username: schema.Username, payload: s
     try:
         question: schema.Question = room.quiz.questions[room.current_question]
     except IndexError:
+        return False
+    
+    if any(answer[0] == payload.question for answer in user.answers):
         return False
 
     user_answer = payload.answer

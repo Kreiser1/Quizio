@@ -15,7 +15,7 @@ def me(profile: depends.Profile):
 def update_profile(session: depends.Session, username: depends.Username, payload: schema.UserUpdate):
     """Изменить профиль текущего пользователя."""
 
-    if isinstance(payload.avatar, schema.Base64) and len(payload.avatar) > config.IMAGE_SIZE_LIMIT:
+    if isinstance(payload.avatar, str) and len(payload.avatar) > config.IMAGE_SIZE_LIMIT:
         raise UnprocessableHTTPException("Аватар слишком большой.")
     elif payload.avatar > 1048576:
         raise UnprocessableHTTPException("Неверный аватар.")
