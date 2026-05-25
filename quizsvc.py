@@ -103,7 +103,7 @@ def update_quiz(
     id: schema.Index,
     quiz_payload: schema.QuizCreate 
 ) -> bool:
-    quiz = session.execute(db.select(db.Quiz).where(db.Quiz.id == quiz_payload.id)).scalar_one_or_none()
+    quiz = session.execute(db.select(db.Quiz).where(db.Quiz.id == id)).scalar_one_or_none()
 
     if not quiz:
         return False

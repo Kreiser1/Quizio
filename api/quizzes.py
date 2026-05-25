@@ -17,26 +17,17 @@ def create_quiz(
     session: depends.Session,
     moderator: depends.Moderator,
     username: depends.Username,
-    payload: schema.QuizCreate | str = Body(...)
+    payload: schema.QuizCreate
 ) -> schema.Quiz:
     """Создать новую викторину."""
 
-    if isinstance(payload, str):
-        if len(payload) > config.QUIZ_SIZE_LIMIT:
-            raise UnprocessableHTTPException("Размер квиза превышает лимит.")
-        
-        try:
-            payload = schema.QuizCreate(title=quiz.title, icon=quiz.icon, questions=schema.Quiz.from_yaml(payload), tags=quiz.tags)
-        except schema.YAMLError:
-            raise UnprocessableHTTPException("Некорректный формат YAML.")
-    else:
-        if isinstance(payload.icon, str) and len(payload.icon) > config.IMAGE_SIZE_LIMIT:
-            raise UnprocessableHTTPException("Иконка слишком большая.")
+    if isinstance(payload.icon, str) and len(payload.icon) > config.IMAGE_SIZE_LIMIT:
+        raise UnprocessableHTTPException("Иконка слишком большая.")
 
-        yaml_text = schema.Quiz.to_yaml(payload.questions)
+    yaml_text = schema.Quiz.to_yaml(payload.questions)
 
-        if len(yaml_text) > config.QUIZ_SIZE_LIMIT:
-            raise UnprocessableHTTPException("Размер квиза превышает лимит.")
+    if len(yaml_text) > config.QUIZ_SIZE_LIMIT:
+        raise UnprocessableHTTPException("Размер квиза превышает лимит.")
 
     quiz = quizsvc.create_quiz(session, username, payload)
 
