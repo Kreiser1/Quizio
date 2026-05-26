@@ -5,6 +5,7 @@ import database as db
 import schema
 import config
 import quizsvc
+import achisvc
 
 
 rooms: dict[schema.RoomToken, schema.Room] = {}
@@ -98,12 +99,14 @@ def search_rooms(query: schema.Title | None = None, count: schema.Count = 25, of
             users_count=room.users_count,
             room_token=token,
             privacy=room.privacy,
+            state='active' if room.current_question is not None else 'waiting',
             quiz=schema.QuizPreview(
                 id=room.quiz.id,
                 title=room.quiz.title,
                 icon=room.quiz.icon,
                 creation_time=room.quiz.creation_time,
-                tags=room.quiz.tags
+                tags=room.quiz.tags,
+                authors=set()
             )
         ))
 
@@ -131,15 +134,16 @@ def submit_answer(token: schema.RoomToken, username: schema.Username, payload: s
     correct_answer = question.answer
     is_correct = False
 
-    if question.type == 'select':
-        is_correct = schema.Index(user_answer) == schema.Index(correct_answer)
-    elif question.type == 'multiselect':
-        try:
+    try:
+        if question.type == 'select':
+            is_correct = schema.Index(user_answer) == schema.Index(correct_answer)
+        elif question.type == 'multiselect':
+            
             is_correct = set(user_answer) == set(correct_answer)
-        except TypeError:
-            return False
-    elif question.type == 'input':
-        is_correct = str(user_answer).lower() == str(correct_answer).lower()
+        elif question.type == 'input':
+            is_correct = str(user_answer).lower() == str(correct_answer).lower()
+    except (schema.ValidationError, TypeError, ValueError):
+        is_correct = False
 
     if is_correct:
         streak_bonus = min(1 + user.answers_streak * 0.2, 2.0)
@@ -177,6 +181,12 @@ def control_room(room_token: schema.RoomToken, payload: schema.RoomControl) -> b
         room.current_question = question
         room.time = None
     elif command == 'end':
+        with db.connect() as session:
+            achievements = achisvc.get_achievements(session)
+            for user in room.users:
+                for achievement in achievements:
+                    achisvc.test_achievement(session, achievement, room, user)
+
         if room_token in rooms:
             del rooms[room_token]
 

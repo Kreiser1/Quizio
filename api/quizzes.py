@@ -36,7 +36,6 @@ def create_quiz(
     
     return quiz
 
-
 @router.get('/query', response_model=list[schema.QuizPreview])
 def search_quizzes(
     session: depends.Session,
@@ -49,7 +48,6 @@ def search_quizzes(
     """Поиск викторин по названию и тегам."""
 
     return quizsvc.search_quizzes(session, query=query, tags=tags, count=count)
-
 
 @router.get('/{id}', response_model=schema.Quiz)
 def get_quiz(
@@ -64,7 +62,6 @@ def get_quiz(
         raise NotFoundHTTPException("Викторина не найдена.")
     
     return quiz
-
 
 @router.patch('/{id}', status_code=status.HTTP_200_OK)
 def update_quiz(
@@ -105,7 +102,6 @@ def update_quiz(
     if not quizsvc.update_quiz(session, username, id, payload):
         raise ConflictHTTPException("Не удалось обновить викторину.")
 
-
 @router.post('/{id}/authors', status_code=status.HTTP_200_OK)
 def add_author(
     session: depends.Session,
@@ -126,6 +122,19 @@ def add_author(
     if not quizsvc.add_quiz_author(session, id, new_author):
         raise ConflictHTTPException("Не удалось добавить автора. Возможно, он уже добавлен.")
 
+@router.get('/{id}/authors', response_model=set[schema.Username])
+def get_authors(
+    session: depends.Session,
+    moderator: depends.Moderator,
+    username: depends.Username,
+    id: schema.Index = Path(...)
+) -> set[schema.Username]:
+    """Получить авторов викторины."""
+
+    if not quizsvc.get_quiz(session, id):
+        raise NotFoundHTTPException("Викторина не найдена.")
+
+    return quizsvc.get_quiz_authors(session, id)
 
 @router.delete('/{id}/authors/{author}', status_code=status.HTTP_200_OK)
 def remove_author(
@@ -146,7 +155,6 @@ def remove_author(
 
     if not quizsvc.remove_quiz_author(session, id, author):
         raise ConflictHTTPException("Не удалось удалить автора или он не является автором.")
-
 
 @router.delete('/{id}', status_code=status.HTTP_200_OK)
 def delete_quiz(
@@ -178,7 +186,6 @@ def search_quizzes(
     """Поиск викторин по названию (LIKE) и тегам с поддержкой постраничной пагинации."""
     tags_set = set(tags) if tags else None
     return quizsvc.search_quizzes(session, query=query, tags=tags_set, count=count, offset=offset)
-
 
 @router.get('/{id}/yaml')
 def download_quiz_yaml(

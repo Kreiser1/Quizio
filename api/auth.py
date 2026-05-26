@@ -1,7 +1,7 @@
 from typing import Annotated
 from fastapi import APIRouter, Depends, Response, Header, status, Cookie
 
-import security, schema, depends
+import security, schema, depends, config
 from exceptions import *
 
 router = APIRouter(prefix='/auth', tags=['Авторизация'])
@@ -42,16 +42,16 @@ def login(
         key=security.ACCESS_COOKIE,
         value=access_token,
         httponly=True,
-        samesite="none",
-        secure=True
+        samesite='lax' if config.DEBUG else 'none',
+        secure=not config.DEBUG
     )
 
     response.set_cookie(
         key=security.REFRESH_COOKIE,
         value=refresh_token,
         httponly=True,
-        samesite="none",
-        secure=True
+        samesite='lax' if config.DEBUG else 'none',
+        secure=not config.DEBUG
     )
 
     return schema.Tokens(access_token=access_token, refresh_token=refresh_token)
@@ -74,8 +74,8 @@ def refresh(
         key=security.ACCESS_COOKIE,
         value=access_token,
         httponly=True,
-        samesite="none",
-        secure=True
+        samesite='lax' if config.DEBUG else 'none',
+        secure=not config.DEBUG
     )
 
     return schema.Tokens(access_token=access_token)

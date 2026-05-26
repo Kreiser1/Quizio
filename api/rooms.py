@@ -7,6 +7,7 @@ import schema
 import depends
 import roomsvc
 import config
+import security
 from exceptions import *
 
 
@@ -18,16 +19,16 @@ def _check_room_owner(room_token: schema.RoomToken, username: schema.Username, r
     if roomsvc.rooms[room_token].owner != username and role != 'administrator':
         raise ForbiddenHTTPException("У вас нет прав для управления этой комнатой.")
 
-def _mask_room_stream(stream: schema.RoomStream, current_username: schema.Username | None) -> schema.RoomStream:
+def _mask_room_stream(stream: schema.RoomStream, username: schema.Username) -> schema.RoomStream:
     masked_stream = stream.model_copy(deep=True)
     
     for user in masked_stream.users:
-        if user.username != current_username:
+        if user.username != username:
             user.answers = set()
             
     for team in masked_stream.teams:
         for user in team.users:
-            if user.username != current_username:
+            if user.username != username:
                 user.answers = set()
                 
     return masked_stream
@@ -78,7 +79,7 @@ def join_room(
         raise ForbiddenHTTPException("Вы забанены или комната не существует.")
 
 @router.post('/{room_token}/answer', status_code=status.HTTP_200_OK)
-def post_answer(
+def submit_answer(
     username: depends.Username,
     room_token: schema.RoomToken = Path(...),
     payload: schema.Answer = Body(...)
@@ -152,10 +153,6 @@ def set_user_team(
     if not roomsvc.set_user_team(room_token, username, team):
         raise NotFoundHTTPException("Не удалось обновить команду пользователя.")
 
-
-from security import decode
-
-
 @router.websocket('/{room_token}/stream')
 async def room_stream(
     websocket: WebSocket,
@@ -164,34 +161,25 @@ async def room_stream(
     await websocket.accept()
 
     username: schema.Username | None = None
-    
+
     try:
-        cookie_header = websocket.headers.get("cookie", "")
-
-        if f"{config.ACCESS_COOKIE}=" in cookie_header:
-            raw_token = cookie_header.split(f"{config.ACCESS_COOKIE}=")[1].split(";")[0]
-            access_token = decode(raw_token)
-
-            if access_token and isinstance(access_token, dict):
-                username = access_token['username']
-    except Exception:
+        if security.ACCESS_COOKIE in websocket.cookies:
+            username = security.decode(websocket.cookies[security.ACCESS_COOKIE])['username']
+    except KeyError, schema.ValidationError:
         username = None
+
+    if not username:
+        await websocket.close()
+        return
     
-    if username:
-        if not roomsvc.join_room(room_token, username):
-            await websocket.close()
-            print('Room join failed.')
-            return
-        
-        if room_token in roomsvc.rooms:
-            user = next((user for user in roomsvc.rooms[room_token].users if user.username == username), None)
-            if user and user.connection_state != 'banned':
-                user.connection_state = 'connected'
-    else:
-        if room_token not in roomsvc.rooms:
-            print('Room token failed.')
-            await websocket.close()
-            return
+    if not roomsvc.join_room(room_token, username):
+        await websocket.close()
+        return
+    
+    if room_token in roomsvc.rooms:
+        user = next((user for user in roomsvc.rooms[room_token].users if user.username == username), None)
+        if user and user.connection_state != 'banned':
+            user.connection_state = 'connected'
 
     try:
         while True:

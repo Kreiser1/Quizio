@@ -19,7 +19,7 @@ Title = Annotated[str, StringConstraints(min_length=3, max_length=128, strip_whi
 Device = Annotated[str, StringConstraints(max_length=128, strip_whitespace=True, pattern=r'^[^\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x9F]*$')]
 Color = Annotated[str, StringConstraints(pattern=r'^#[a-fA-F0-9]{6}$')]
 Code = Annotated[str, StringConstraints(min_length=4, max_length=16384, strip_whitespace=False)]
-Base64 = Annotated[str, StringConstraints(pattern=r'^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$')]
+Base64 = Annotated[str, StringConstraints(min_length=16, pattern=r'^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$')]
 Email = Annotated[str, StringConstraints(min_length=5, max_length=254, strip_whitespace=True, to_lower=True, pattern=r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$')]
 Index = Annotated[int, Field(ge=0)]
 Count = Annotated[int, Field(ge=0)]
@@ -60,7 +60,7 @@ class UserProfile(BaseModel):
     username: Username
     full_name: FullName | None = None
     email: Email | None = None
-    avatar: Base64 | Index = 0
+    avatar: Index | Base64 = 0
     creation_time: DateTime | None = None
     role: Role
 
@@ -83,7 +83,7 @@ class UserRegistration(BaseModel):
 
 class UserUpdate(BaseModel):
     full_name: FullName | None = None
-    avatar: Base64 | Index = 0
+    avatar: Index | Base64 = 0
 
 
 class UserRecovery(BaseModel):
@@ -116,26 +116,28 @@ class Answer(BaseModel):
 class QuizPreview(BaseModel):
     id: Index
     title: Title
-    icon: Base64 | Index = 0
+    icon: Index | Base64 = 0
     creation_time: DateTime
     tags: set[Tag] | None = None
+    authors: set[Username]
 
 
 class QuizCreate(BaseModel):
     title: Title
-    icon: Base64 | Index = 0
+    icon: Index | Base64 = 0
     questions: list[Question]
     tags: set[Tag] | None = None
 
 class Quiz(BaseModel):
     id: Index
     title: Title
-    icon: Base64 | Index = 0
+    icon: Index | Base64 = 0
     questions: list[Question]
     creation_time: DateTime
     edit_time: DateTime | None = None
     last_edit_username: Username | None = None
     tags: set[Tag] | None = None
+    authors: set[Username]
 
     @computed_field
     def questions_count(self) -> Count:
@@ -145,6 +147,10 @@ class Quiz(BaseModel):
     def score(self) -> Count:
         return sum(map(lambda question: question.score, self.questions))
     
+    @computed_field
+    def authors_count(self) -> Count:
+        return len(self.authors)
+
 
     class QuestionsYaml(BaseModel):
         questions: list[Question]
@@ -217,6 +223,7 @@ class RoomPreview(BaseModel):
     privacy: RoomPrivacy
     quiz: QuizPreview
     room_token: RoomToken
+    state: Literal['waiting', 'active'] = 'waiting'
 
 
 class RoomStream(BaseModel):
@@ -264,14 +271,14 @@ class RoomControl(BaseModel):
 
 class AchievementCreate(BaseModel):
     title: Title
-    icon: Base64 | Index = 0
+    icon: Index | Base64 = 0
     condition: Code
 
 
 class Achievement(BaseModel):
     id: Index
     title: Title
-    icon: Base64 | Index = 0
+    icon: Index | Base64 = 0
     condition: Code
 
 

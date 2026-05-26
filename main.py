@@ -1,14 +1,16 @@
 from fastapi import FastAPI, Request, HTTPException, status
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 import security, schema, config, database as db
 
 with db.connect() as session:
-    if security.register(session, schema.UserRegistration(
-        username=config.ADMIN_USERNAME,
-        password=config.ADMIN_PASSWORD
-    )):
-        security.update_role(session, schema.UserRoleUpdate(username=config.ADMIN_USERNAME, role='administrator'))
+    if not session.execute(db.select(db.User)).first():
+        if security.register(session, schema.UserRegistration(
+            username=config.ADMIN_USERNAME,
+            password=config.ADMIN_PASSWORD
+        )):
+            security.update_role(session, schema.UserRoleUpdate(username=config.ADMIN_USERNAME, role='administrator'))
 
 import config
 from api import api_router
@@ -58,17 +60,13 @@ def http_too_many_requests(request: Request, exception: HTTPException):
         content={"detail": exception.detail}
     )
 
-origins = [
-    "http://localhost:3000",
-    "https://quizio.com" # Домен
-]
-
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
+    allow_origin_regex=r'^https?://(localhost|127\.0\.0\.1)(:\d+)?$',
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 app.include_router(api_router)
+app.mount('/', StaticFiles(directory='frontend', html=True), name='Frontend')

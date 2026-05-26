@@ -34,7 +34,8 @@ def create_quiz(
             icon=new_quiz.icon,
             questions=new_quiz.questions,
             creation_time=new_quiz.creation_time,
-            tags=quiz_payload.tags or set()
+            tags=quiz_payload.tags or set(),
+            authors=set((author,))
         )
     except db.IntegrityError:
         return None
@@ -56,7 +57,8 @@ def get_quiz(session: db.Session, id: schema.Index) -> schema.Quiz | None:
         creation_time=quiz.creation_time,
         edit_time=quiz.edit_time,
         last_edit_username=quiz.last_edit_username,
-        tags=set(tags) if tags else None
+        tags=set(tags) if tags else None,
+        authors=get_quiz_authors(session, quiz.id)
     )
 
 
@@ -91,7 +93,8 @@ def get_user_quizzes(session: db.Session, username: schema.Username) -> list[sch
             title=quiz.title,
             icon=quiz.icon,
             creation_time=quiz.creation_time,
-            tags=tags_map.get(quiz.id, set())
+            tags=tags_map.get(quiz.id, set()),
+            authors=get_quiz_authors(session, quiz.id)
         ))
         
     return result
@@ -176,7 +179,8 @@ def search_quizzes(
             title=quiz.title,
             icon=quiz.icon,
             creation_time=quiz.creation_time,
-            tags=tags_map.get(quiz.id, set())
+            tags=tags_map.get(quiz.id, set()),
+            authors=get_quiz_authors(session, quiz.id)
         ))
         
     return result
@@ -206,6 +210,9 @@ def remove_quiz_author(session: db.Session, id: schema.Index, author: schema.Use
             db.user_quiz.c.username == author
         )
     ).rowcount > 0
+
+def get_quiz_authors(session: db.Session, id: schema.Index) -> list[schema.Username]:
+    return session.execute(db.select(db.user_quiz.c.username).where(db.user_quiz.c.quiz_id == id)).scalars().all()
 
 def delete_quiz(session: db.Session, quiz_id: int) -> bool:
     return session.execute(db.delete(db.Quiz).where(db.Quiz.id == quiz_id)).rowcount > 0

@@ -88,7 +88,7 @@ def get_my_achievements(
         schema.AchievementCreate(
             title=achievement.title,
             icon=achievement.icon,
-            condition=''
+            condition='<secret>'
         )
         for achievement in user_achievements
     ]

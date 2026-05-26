@@ -49,7 +49,8 @@ def get_user_achievements(session: db.Session, username: schema.Username) -> lis
     achievements = session.execute(db.select(
             db.Achievement.id,
             db.Achievement.title,
-            db.Achievement.icon
+            db.Achievement.icon,
+            db.Achievement.condition
         )
         .join(db.user_achievement, db.Achievement.id == db.user_achievement.c.achievement_id)
         .where(db.user_achievement.c.username == username)).all()
@@ -59,7 +60,7 @@ def get_user_achievements(session: db.Session, username: schema.Username) -> lis
             id=achievement[0],
             title=achievement[1],
             icon=achievement[2],
-            condition=''
+            condition=achievement[3]
         )
         for achievement in achievements
     ]
@@ -83,10 +84,10 @@ def get_achievements(session: db.Session) -> list[schema.Achievement]:
     ]
 
 def test_achievement(session: db.Session, achievement: schema.Achievement, room: schema.Room, room_user: schema.RoomUser) -> bool:
-    if session.execute(db.exists(db.user_achievement).where(
+    if session.execute(db.select(db.exists(db.user_achievement).where(
         db.user_achievement.c.achievement_id == achievement.id,
         db.user_achievement.c.username == room_user.username
-    )):
+    ))).scalar():
         return False
     
     try:
