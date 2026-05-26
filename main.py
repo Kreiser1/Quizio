@@ -1,5 +1,5 @@
 from fastapi import FastAPI, Request, HTTPException, status
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 import security, schema, config, database as db
@@ -47,18 +47,16 @@ def custom_openapi():
 
 app.openapi = custom_openapi
 
-@app.exception_handler(HTTPException)
+@app.exception_handler(status.HTTP_429_TOO_MANY_REQUESTS)
 def http_too_many_requests(request: Request, exception: HTTPException):
-    if exception.status_code == status.HTTP_429_TOO_MANY_REQUESTS:
-        return JSONResponse(
+    return JSONResponse(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             content={"detail": "Слишком много попыток. Пожалуйста, подождите перед следующей отправкой."}
-        )
+        )    
     
-    return JSONResponse(
-        status_code=exception.status_code,
-        content={"detail": exception.detail}
-    )
+@app.exception_handler(status.HTTP_404_NOT_FOUND)
+def http_404(request: Request, exception: HTTPException):
+    return Response(status_code=status.HTTP_404_NOT_FOUND)
 
 app.add_middleware(
     CORSMiddleware,

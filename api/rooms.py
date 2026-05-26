@@ -40,6 +40,8 @@ def create_room(
     username: depends.Username,
     payload: schema.RoomCreate = Body(...)
 ) -> schema.RoomToken:
+    """Создать комнату."""
+
     room_token = roomsvc.create_room(session, username, payload)
 
     if not room_token:
@@ -56,6 +58,8 @@ def update_room(
     room_token: schema.RoomToken = Path(...),
     payload: schema.RoomCreate = Body(...)
 ):
+    """Обновить комнату."""
+
     _check_room_owner(room_token, username, role)
     
     if not roomsvc.update_room(session, room_token, payload):
@@ -68,6 +72,8 @@ def search_rooms(
     count: schema.Count = Query(default=25),
     offset: schema.Index = Query(default=0)
 ) -> list[schema.RoomPreview]:
+    """Поиск открытых комнат."""
+
     return roomsvc.search_rooms(query=query, count=count, offset=offset)
 
 @router.get('/{room_token}', status_code=status.HTTP_200_OK)
@@ -75,6 +81,8 @@ def join_room(
     username: depends.Username,
     room_token: schema.RoomToken = Path(...)
 ):
+    """Присоединиться к комнате."""
+
     if not roomsvc.join_room(room_token, username):
         raise ForbiddenHTTPException("Вы забанены или комната не существует.")
 
@@ -84,6 +92,8 @@ def submit_answer(
     room_token: schema.RoomToken = Path(...),
     payload: schema.Answer = Body(...)
 ) -> bool:
+    """Отправить ответ."""
+
     return roomsvc.submit_answer(room_token, username, payload)
 
 @router.post('/{room_token}/control', status_code=status.HTTP_200_OK)
@@ -94,6 +104,8 @@ def control_room(
     room_token: schema.RoomToken = Path(...),
     payload: schema.RoomControl = Body(...)
 ):
+    """Отправить команду управления комнатой."""
+
     _check_room_owner(room_token, username, role)
 
     result = roomsvc.control_room(room_token, payload)
@@ -106,6 +118,8 @@ def ban_user(
     moderator: depends.Moderator, username: depends.Username, role: depends.Role,
     room_token: schema.RoomToken = Path(...), target_user: schema.Username = Body(embed=True)
 ):
+    """Забанить пользователя."""
+
     _check_room_owner(room_token, username, role)
 
     if not roomsvc.ban_user(room_token, target_user):
@@ -116,6 +130,8 @@ def unban_user(
     moderator: depends.Moderator, username: depends.Username, role: depends.Role,
     room_token: schema.RoomToken = Path(...), target_user: schema.Username = Body(embed=True)
 ):
+    """Разбанить пользователя."""
+
     _check_room_owner(room_token, username, role)
 
     if not roomsvc.unban_user(room_token, target_user):
@@ -126,6 +142,8 @@ def add_team(
     moderator: depends.Moderator, username: depends.Username, role: depends.Role,
     room_token: schema.RoomToken = Path(...), payload: schema.RoomTeam = Body(...)
 ):
+    """Добавить команду."""
+
     _check_room_owner(room_token, username, role)
 
     if not roomsvc.add_team(room_token, payload):
@@ -136,6 +154,8 @@ def delete_team(
     moderator: depends.Moderator, username: depends.Username, role: depends.Role,
     room_token: schema.RoomToken = Path(...), title: schema.Title = Path(...)
 ):
+    """Удалить команду."""
+    
     _check_room_owner(room_token, username, role)
 
     if not roomsvc.delete_team(room_token, title):
@@ -148,6 +168,8 @@ def set_user_team(
     username: schema.Username = Body(...),
     team: schema.Title | None = Body(default=None)
 ):
+    """Установить команду пользователя."""
+    
     _check_room_owner(room_token, current_username, role)
 
     if not roomsvc.set_user_team(room_token, username, team):
@@ -158,6 +180,8 @@ async def room_stream(
     websocket: WebSocket,
     room_token: schema.RoomToken = Path(...)
 ):
+    """WebSocket для просмотра комнаты в реальном времени."""
+
     await websocket.accept()
 
     username: schema.Username | None = None
