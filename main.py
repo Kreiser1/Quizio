@@ -1,8 +1,9 @@
 from fastapi import FastAPI, Request, HTTPException, status
-from fastapi.responses import JSONResponse, Response
+from fastapi.responses import JSONResponse, Response, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-import security, schema, config, database as db
+import os, security, schema, config, database as db
+import mimetypes
 
 with db.connect() as session:
     if not session.execute(db.select(db.User)).first():
@@ -67,4 +68,21 @@ app.add_middleware(
 )
 
 app.include_router(api_router)
-app.mount('/', StaticFiles(directory='frontend', html=True), name='Frontend')
+
+FRONTEND = 'frontend'
+
+@app.get("/{route:path}")
+def frontend(route: str):
+    if route.lower().startswith("api/"):
+        return Response(status_code=status.HTTP_404_NOT_FOUND)
+        
+    if not route and os.path.exists(FRONTEND + '/index.html'):
+        return FileResponse(FRONTEND + '/index.html')
+        
+    path = os.path.join(FRONTEND, route)
+
+    if os.path.exists(path) and os.path.isfile(path):
+        media_type, _ = mimetypes.guess_type(path)
+        return FileResponse(path, media_type=media_type)
+    
+    return FileResponse(FRONTEND + '/index.html') if os.path.exists(FRONTEND + '/index.html') else Response(status_code=status.HTTP_404_NOT_FOUND)
