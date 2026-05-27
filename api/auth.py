@@ -56,6 +56,10 @@ def login(
 
     return schema.Tokens(access_token=access_token, refresh_token=refresh_token)
 
+@router.post('/refresh', status_code=status.HTTP_200_OK)
+def refresh(username: depends.Username, cooldown: depends.Cooldown):
+    """Обновляет токен доступа."""
+
 @router.post('/logout', status_code=status.HTTP_200_OK)
 def logout(
     session: depends.Session,
