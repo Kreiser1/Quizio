@@ -12,6 +12,7 @@ def configuration() -> Configuration:
     return Configuration(
         auth_cooldown=config.AUTH_COOLDOWN,
         auth_expiration=config.AUTH_EXPIRATION,
+        token_expiration=config.TOKEN_EXPIRATION,
         image_size_limit=config.IMAGE_SIZE_LIMIT,
         quiz_size_limit=config.QUIZ_SIZE_LIMIT,
         frequency=config.FREQUENCY

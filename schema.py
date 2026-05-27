@@ -46,6 +46,7 @@ def parse_datetime(datetime_: DateTime) -> datetime:
 class Configuration(BaseModel):
     auth_cooldown: Count
     auth_expiration: Count
+    token_expiration: Count
     image_size_limit: Count
     quiz_size_limit: Count
     frequency: Time
