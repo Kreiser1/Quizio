@@ -49,17 +49,6 @@ def custom_openapi():
 
 app.openapi = custom_openapi
 
-@app.exception_handler(status.HTTP_429_TOO_MANY_REQUESTS)
-def http_too_many_requests(request: Request, exception: HTTPException):
-    return JSONResponse(
-            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            content=TooManyRequestsHTTPException().detail
-        )
-    
-@app.exception_handler(status.HTTP_404_NOT_FOUND)
-def http_404(request: Request, exception: HTTPException):
-    return Response(status_code=status.HTTP_404_NOT_FOUND)
-
 app.add_middleware(
     CORSMiddleware,
     allow_origin_regex=r'^https?://(localhost|127\.0\.0\.1)(:\d+)?$',

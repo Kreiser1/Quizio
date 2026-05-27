@@ -175,31 +175,60 @@ def set_user_team(
     if not roomsvc.set_user_team(room_token, username, team):
         raise NotFoundHTTPException("Не удалось обновить команду пользователя.")
 
+
+from pydantic import TypeAdapter
+
+
+def _authorize_room_steam(
+    session: Session,
+    access_token: str | None,
+    refresh_token: str | None
+) -> schema.Username | None:
+    if not refresh_token:
+        return None
+
+    try:
+        refresh_token = TypeAdapter(schema.RefreshToken).validate_python(refresh_token)
+    except schema.ValidationError:
+        return None
+    
+    try:
+        access_token = TypeAdapter(schema.AccessToken).validate_python(access_token)
+    except schema.ValidationError:
+        access_token = None
+    
+    username: schema.Username | None = None
+
+    if access_token:
+        username = security.login(refresh_token, access_token)
+
+    if not username:
+        access_token = security.refresh(session, refresh_token)
+        if access_token:
+            username = security.login(refresh_token, access_token)
+
+    return username
+
 @router.websocket('/{room_token}/stream')
 async def room_stream(
     websocket: WebSocket,
+    session: depends.Session,
     room_token: schema.RoomToken = Path(...)
 ):
     """WebSocket для просмотра комнаты в реальном времени."""
 
-    await websocket.accept()
-
-    username: schema.Username | None = None
-
-    try:
-        if security.ACCESS_COOKIE in websocket.cookies:
-            username = security.decode(websocket.cookies[security.ACCESS_COOKIE])['username']
-    except KeyError, schema.ValidationError:
-        username = None
+    username = _authorize_room_steam(session, websocket.cookies.get(security.ACCESS_COOKIE), websocket.cookies.get(security.REFRESH_COOKIE))
 
     if not username:
-        await websocket.close()
+        await websocket.close(code=1008, reason=UnauthorizedHTTPException().detail)
         return
     
     if not roomsvc.join_room(room_token, username):
-        await websocket.close()
+        await websocket.close(code=1008, reason=ForbiddenHTTPException().detail)
         return
-    
+
+    await websocket.accept()
+
     if room_token in roomsvc.rooms:
         user = next((user for user in roomsvc.rooms[room_token].users if user.username == username), None)
         if user and user.connection_state != 'banned':
@@ -223,7 +252,6 @@ async def room_stream(
                 await websocket.send_json({})
                 
             await asyncio.sleep(1.0 / config.FREQUENCY)
-            
     except WebSocketDisconnect:
         if username and room_token in roomsvc.rooms:
             user = next((user for user in roomsvc.rooms[room_token].users if user.username == username), None)
