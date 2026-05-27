@@ -165,7 +165,7 @@ def delete_quiz(
     role: depends.Role,
     id: schema.Index = Path(...)
 ):
-    """Удалить викторину целиком."""
+    """Удалить викторину."""
     if not quizsvc.get_quiz(session, id):
         raise NotFoundHTTPException("Викторина не найдена.")
 

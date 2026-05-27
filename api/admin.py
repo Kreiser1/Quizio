@@ -13,7 +13,7 @@ def get_users(session: depends.Session, administrator: depends.Administrator) ->
     return usersvc.get_users(session)
 
 @router.patch('/users', response_model=schema.UserProfile)
-def update_profile(session: depends.Session, payload: schema.UserRoleUpdate, administrator: depends.Administrator) -> schema.UserProfile:
+def update_role(session: depends.Session, payload: schema.UserRoleUpdate, administrator: depends.Administrator) -> schema.UserProfile:
     """Изменить роль пользователя по имени."""
 
     if not usersvc.update_role(session, payload):
