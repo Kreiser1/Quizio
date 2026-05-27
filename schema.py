@@ -92,7 +92,7 @@ class UserRecovery(BaseModel):
 
 
 class UserCredentialsUpdate(BaseModel):
-    password: Password
+    old_password: Password
     new_password: Password | None = None
     new_email: Email | None = None
 

@@ -30,7 +30,6 @@ def create_achievement(
         compile(payload.condition, "<string>", "eval")
     except SyntaxError:
         raise UnprocessableHTTPException("Некорректный синтаксис в условии достижения.")
-    
 
     achievement = achisvc.create_achievement(session, payload)
 
@@ -47,9 +46,7 @@ def delete_achievement(
 ):
     """Удалить достижение."""
 
-    success = achisvc.delete_achievement(session, id)
-
-    if not success:
+    if not achisvc.delete_achievement(session, id):
         raise NotFoundHTTPException("Достижение не найдено.")
 
 @router.get('/yaml', status_code=status.HTTP_200_OK)
@@ -57,7 +54,7 @@ def download_achievements_yaml(
     session: depends.Session,
     moderator: depends.Moderator
 ):
-    """Скачать .yaml всех достижений."""
+    """Скачать .yaml достижений."""
 
     achievements = achisvc.get_achievements(session)
     
@@ -65,10 +62,10 @@ def download_achievements_yaml(
         raise NotFoundHTTPException("Список достижений пуст.")
 
     file_like = io.BytesIO(schema.Achievement.to_yaml(achievements).encode('utf-8'))
-    filename = "achievements.yaml"
+    filename = 'achievements.yaml'
 
     return StreamingResponse(
-        schema.Achievement.to_yaml(achievements), 
+        file_like, 
         media_type='application/x-yaml',
         headers={
             'Content-Disposition': f'attachment; filename="{filename}"'
@@ -80,7 +77,7 @@ def get_my_achievements(
     session: depends.Session,
     username: depends.Username
 ) -> list[schema.AchievementCreate]:
-    """Получить список всех достижений текущего пользователя."""
+    """Получить список достижений текущего пользователя."""
     
     user_achievements = achisvc.get_user_achievements(session, username)
         

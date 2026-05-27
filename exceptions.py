@@ -27,5 +27,20 @@ class UnprocessableHTTPException(HTTPException):
 
 
 class NotImplementedHTTPException(HTTPException):
-	def __init__(self, detail: str | None = "Эндпоинт не имплементирован."):
-		super().__init__(status_code=status.HTTP_405_METHOD_NOT_ALLOWED, detail=detail)
+	def __init__(self, detail: str | None = "Функция не имплементирована."):
+		super().__init__(status_code=status.HTTP_501_NOT_IMPLEMENTED, detail=detail)
+
+
+class TooManyRequestsHTTPException(HTTPException):
+	def __init__(self, detail: str | None = "Слишком много попыток. Попробуйте позже."):
+		super().__init__(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail=detail)
+
+
+class BadRequestHTTPException(HTTPException):
+	def __init__(self, detail: str | None = "Некорректный запрос."):
+		super().__init__(status_code=status.HTTP_400_BAD_REQUEST, detail=detail)
+
+
+class UnknownHTTPException(HTTPException):
+	def __init__(self, detail: str | None = "Неизвестная ошибка."):
+		super().__init__(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=detail)

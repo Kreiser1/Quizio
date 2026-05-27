@@ -1,60 +1,96 @@
 from typing import Annotated
 
-from fastapi import Depends, Cookie, Body, Header
+from fastapi import Depends, Cookie, Header, Response, Request
 from fastapi_throttle import RateLimiter
 from pydantic import TypeAdapter
 
+from collections import defaultdict
 import database as db
 import security, schema, config, usersvc
+from time import time
 from exceptions import *
 
 
 Cooldown = Annotated[None, Depends(RateLimiter(times=1, seconds=config.AUTH_COOLDOWN))]
 
+_COOLDOWN = defaultdict(list)
+
+def _check_cooldown(request: Request):
+    client_ip = request.client.host if request.client else "Unknown"
+    now = time()
+    
+    _COOLDOWN[client_ip] = [
+        time for time in _COOLDOWN[client_ip] 
+        if now - time < config.AUTH_COOLDOWN
+    ]
+    
+    if len(_COOLDOWN[client_ip]) >= 1:
+        raise TooManyRequestsHTTPException()
+        
+    _COOLDOWN[client_ip].append(now)
+
 Session = Annotated[db.Session, Depends(db.session)]
 
-def _get_refresh_token(
+def _authorize(
+    session: Session,
+    request: Request,
+    response: Response,
+    access_token_cookie: Annotated[str| None, Cookie(alias=security.ACCESS_COOKIE)] = None,
     refresh_token_cookie: Annotated[str | None, Cookie(alias=security.REFRESH_COOKIE)] = None,
-    refresh_token_body: Annotated[str | None, Body(embed=True, alias="refresh_token")] = None,
-    x_refresh_token: Annotated[str | None, Header(alias="X-Refresh-Token")] = None
-) -> schema.RefreshToken:
-    
-    refresh_token = refresh_token_cookie or refresh_token_body or x_refresh_token
-    
+    access_token: Annotated[str | None, Header()] = None,
+    refresh_token: Annotated[str | None, Header()] = None,
+) -> schema.Username | None:
+    access_token = access_token_cookie or access_token
+    refresh_token = refresh_token_cookie or refresh_token
+
     if not refresh_token:
-        raise UnauthorizedHTTPException("Токен авторизации не предоставлен.")
-        
+        return None
+
     try:
-        return TypeAdapter(schema.RefreshToken).validate_python(refresh_token)
+        refresh_token = TypeAdapter(schema.RefreshToken).validate_python(refresh_token)
     except schema.ValidationError:
-        raise UnauthorizedHTTPException("Неверный формат токена авторизации.")
-    
-RefreshToken = Annotated[schema.RefreshToken, Depends(_get_refresh_token)]
-
-def _get_username(
-	access_token: Annotated[str| None, Cookie(alias=security.ACCESS_COOKIE)] = None,
-	refresh_token_cookie: Annotated[str| None, Cookie(alias=security.REFRESH_COOKIE)] = None,
-    authorization: Annotated[str | None, Header()] = None,
-    x_refresh_token: Annotated[str | None, Header(alias="X-Refresh-Token")] = None
-) -> schema.Username:
-    if not access_token and authorization and authorization.startswith("Bearer "):
-        access_token = authorization.split(" ")[1]
-    
-    refresh_token = refresh_token_cookie or x_refresh_token
-
-    if not access_token or not refresh_token:
-        raise UnauthorizedHTTPException("Токены авторизации не предоставлены.")
+        return None
     
     try:
         access_token = TypeAdapter(schema.AccessToken).validate_python(access_token)
-        refresh_token = TypeAdapter(schema.RefreshToken).validate_python(refresh_token)
     except schema.ValidationError:
-        raise UnauthorizedHTTPException("Неверный формат токенов авторизации.")
+        access_token = None
+    
+    username: schema.Username | None = None
+    new_access_token = False
 
-    username = security.login(refresh_token, access_token)
+    if not access_token:
+        _check_cooldown(request)
 
+        if not ((access_token := security.refresh(session, refresh_token)) and (new_access_token := True)):
+            return None
+    elif not (username := security.login(refresh_token, access_token)):
+        _check_cooldown(request)
+
+        if not ((access_token := security.refresh(session, refresh_token)) and (new_access_token := True)):
+            return None
+
+    if not username and not (username := security.login(refresh_token, access_token)):
+        return None
+
+    if new_access_token:
+        response.set_cookie(
+            key=security.ACCESS_COOKIE,
+            value=access_token,
+            httponly=True,
+            samesite='lax' if config.DEBUG else 'none',
+            secure=not config.DEBUG
+        )
+    
+    return username
+
+Authorize = Annotated[schema.Username | None, Depends(_authorize)]
+
+def _get_username(
+	username: Authorize,
+) -> schema.Username:
     if not username:
-        raise UnauthorizedHTTPException("Ошибка при авторизации. Попробуйте обновить токен.")
+        raise UnauthorizedHTTPException()
     
     return username
 
@@ -64,12 +100,7 @@ def _get_role(
     session: Session,
 	username: Username
 ) -> schema.Role:
-    role = session.execute(db.select(db.User.role).where(db.User.username == username)).scalar()
-
-    if not role:
-        raise UnauthorizedHTTPException()
-
-    return role
+    return security.get_role(session, username) or 'user'
 
 Role = Annotated[schema.Role, Depends(_get_role)]
 
@@ -84,43 +115,16 @@ def _require_moderator(role: Role):
 Administrator = Annotated[None, Depends(_require_administrator)]
 Moderator = Annotated[None, Depends(_require_moderator)]
 
-def _get_optional_username(
-	access_token: Annotated[str| None, Cookie(alias=security.ACCESS_COOKIE)] = None,
-	refresh_token: Annotated[str| None, Cookie(alias=security.REFRESH_COOKIE)] = None,
-) -> schema.Username | None:
-    if not access_token or not refresh_token:
-        return None
-    
-    try:
-        access_token = TypeAdapter(schema.AccessToken).validate_python(access_token)
-        refresh_token = TypeAdapter(schema.RefreshToken).validate_python(refresh_token)
-    except schema.ValidationError:
-        return None
-
-    username = security.login(refresh_token, access_token)
-
-    if not username:
-        return None
-    
-    return username
-
-OptionalUsername = Annotated[schema.Username | None, Depends(_get_optional_username)]
-
 def _get_optional_role(
     session: Session,
-	username: OptionalUsername
-) -> schema.Role | None:
+	username: Authorize
+) -> schema.Role:
     if not username:
-        return None
+        return 'user'
 
-    role = session.execute(db.select(db.User.role).where(db.User.username == username)).scalar()
+    return security.get_role(session, username) or 'user'
 
-    if not role:
-        UnauthorizedHTTPException()
-
-    return role
-
-OptionalRole = Annotated[schema.Role | None, Depends(_get_optional_role)]
+OptionalRole = Annotated[schema.Role, Depends(_get_optional_role)]
 
 def _get_user_profile(
     session: Session,

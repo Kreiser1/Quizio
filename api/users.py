@@ -31,7 +31,7 @@ def update_profile(session: depends.Session, username: depends.Username, payload
     return profile
 
 @router.get('/{username}', response_model=schema.UserProfile)
-def get_profile(session: depends.Session, current_username: depends.OptionalUsername, role: depends.OptionalRole,
+def get_profile(session: depends.Session, current_username: depends.Authorize, role: depends.OptionalRole,
        username: schema.Username = Path(...)) -> schema.UserProfile:
     """Получить профиль пользователя по имени."""
 

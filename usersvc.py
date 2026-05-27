@@ -36,3 +36,6 @@ def update_role(session: db.Session, user_role_update_payload: schema.UserRoleUp
 
 def delete_profile(session: db.Session, username: schema.Username) -> bool:
     return session.execute(db.delete(db.User).where(db.User.username == username)).rowcount > 0
+
+def get_users(session: db.Session) -> set[schema.Username]:
+    return session.execute(db.select(db.User.username)).scalars().all()

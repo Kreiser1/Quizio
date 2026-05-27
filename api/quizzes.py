@@ -56,6 +56,7 @@ def get_quiz(
     id: schema.Index = Path(...)
 ) -> schema.Quiz:
     """Получить викторину по ID."""
+
     quiz = quizsvc.get_quiz(session, id)
 
     if not quiz:
@@ -109,7 +110,7 @@ def add_author(
     username: depends.Username,
     role: depends.Role,
     id: schema.Index = Path(...),
-    new_author: schema.Username = Body(embed=True)
+    author: schema.Username = Body(embed=True)
 ):
     """Добавить соавтора к викторине."""
 
@@ -119,7 +120,7 @@ def add_author(
     if not quizsvc.is_quiz_author(session, id, username) and role != 'administrator':
         raise ForbiddenHTTPException("У вас нет прав для изменения состава авторов.")
 
-    if not quizsvc.add_quiz_author(session, id, new_author):
+    if not quizsvc.add_quiz_author(session, id, author):
         raise ConflictHTTPException("Не удалось добавить автора. Возможно, он уже добавлен.")
 
 @router.get('/{id}/authors', response_model=set[schema.Username])
@@ -178,12 +179,13 @@ def delete_quiz(
 def search_quizzes(
     session: depends.Session,
     moderator: depends.Moderator,
-    query: schema.Title | None = Query(default=None, description="Поиск по названию"),
-    tags: list[schema.Tag] | None = Query(default=None, description="Фильтр по тегам (AND)"),
-    count: schema.Count = Query(default=25, description="Количество результатов (LIMIT)"),
-    offset: schema.Index = Query(default=0, description="Смещение для пагинации (OFFSET)")  # Добавлено
+    query: schema.Title | None = Query(default=None),
+    tags: list[schema.Tag] | None = Query(default=None),
+    count: schema.Count = Query(default=25),
+    offset: schema.Index = Query(default=0)
 ) -> list[schema.QuizPreview]:
-    """Поиск викторин по названию (LIKE) и тегам с поддержкой постраничной пагинации."""
+    """Поиск викторин по названию и тегам с поддержкой постраничной пагинации."""
+
     tags_set = set(tags) if tags else None
     return quizsvc.search_quizzes(session, query=query, tags=tags_set, count=count, offset=offset)
 

@@ -3,6 +3,7 @@ from fastapi.responses import JSONResponse, Response, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 import os, security, schema, config, database as db
+from exceptions import *
 import mimetypes
 
 with db.connect() as session:
@@ -52,8 +53,8 @@ app.openapi = custom_openapi
 def http_too_many_requests(request: Request, exception: HTTPException):
     return JSONResponse(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            content={"detail": "Слишком много попыток. Пожалуйста, подождите перед следующей отправкой."}
-        )    
+            content=TooManyRequestsHTTPException().detail
+        )
     
 @app.exception_handler(status.HTTP_404_NOT_FOUND)
 def http_404(request: Request, exception: HTTPException):

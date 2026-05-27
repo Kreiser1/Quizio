@@ -130,7 +130,7 @@ def update(session: db.Session, username: schema.Username, user_credentials_upda
         if not password_hash:
             return False
         
-        if not compare(user_credentials_update_payload.password, password_hash):
+        if not compare(user_credentials_update_payload.old_password, password_hash):
             return False
     
     params = {
@@ -160,6 +160,9 @@ def refresh(session: db.Session, refresh_token: schema.RefreshToken) -> schema.A
         'refresh_token': refresh_token,
         'expiration_time': int(time() + TOKEN_EXPIRATION)
     })
+
+def get_role(session: db.Session, username: schema.Username) -> schema.Role | None:
+    return session.execute(db.select(db.User.role).where(db.User.username == username)).scalar()
 
 recovery = {}
 

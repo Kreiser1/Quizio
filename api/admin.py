@@ -6,11 +6,11 @@ from exceptions import *
 
 router = APIRouter(prefix='/admin', tags=['Администрирование'])
 
-@router.get('/users', response_model=list[schema.Username])
-def get_users(session: depends.Session, administrator: depends.Administrator):
+@router.get('/users', response_model=set[schema.Username])
+def get_users(session: depends.Session, administrator: depends.Administrator) -> set[schema.Username]:
     """Получить список пользователей."""
 
-    return session.execute(db.select(db.User.username)).scalars().all()
+    return usersvc.get_users(session)
 
 @router.patch('/users', response_model=schema.UserProfile)
 def update_profile(session: depends.Session, payload: schema.UserRoleUpdate, administrator: depends.Administrator) -> schema.UserProfile:
@@ -22,7 +22,7 @@ def update_profile(session: depends.Session, payload: schema.UserRoleUpdate, adm
     profile = usersvc.get_profile(session, payload.username)
 
     if not profile:
-        raise NotFoundHTTPException("Пользователь не найден.")
+        raise UnknownHTTPException()
     
     return profile
 
@@ -32,7 +32,7 @@ def update_profile(session: depends.Session, payload: schema.UserUpdate | schema
     """Изменить профиль пользователя по имени."""
 
     if isinstance(payload, schema.UserUpdate):
-        if isinstance(payload.avatar, schema.Base64) and len(payload.avatar) > config.AVATAR_SIZE_LIMIT:
+        if isinstance(payload.avatar, str) and len(payload.avatar) > config.AVATAR_SIZE_LIMIT:
             raise UnprocessableHTTPException("Аватар слишком большой.")
         elif payload.avatar > 1048576:
             raise UnprocessableHTTPException("Неверный аватар.")
@@ -41,12 +41,12 @@ def update_profile(session: depends.Session, payload: schema.UserUpdate | schema
             raise NotFoundHTTPException("Не удалось обновить данные пользователя. Проверьте имя.")
     elif isinstance(payload, schema.UserCredentialsUpdate):
         if not security.update(session, payload, force=True):
-            raise NotFoundHTTPException("Не удалось обновить данные пользователя. Проверьте имя.")
+            raise NotFoundHTTPException("Не удалось обновить данные для входа пользователя. Проверьте имя.")
 
     profile = usersvc.get_profile(session, username)
 
     if not profile:
-        raise NotFoundHTTPException("Пользователь не найден.")
+        raise UnknownHTTPException()
     
     return profile
 

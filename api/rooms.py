@@ -116,25 +116,25 @@ def control_room(
 @router.post('/{room_token}/ban', status_code=status.HTTP_200_OK)
 def ban_user(
     moderator: depends.Moderator, username: depends.Username, role: depends.Role,
-    room_token: schema.RoomToken = Path(...), target_user: schema.Username = Body(embed=True)
+    room_token: schema.RoomToken = Path(...), ban_username: schema.Username = Body(embed=True)
 ):
     """Забанить пользователя."""
 
     _check_room_owner(room_token, username, role)
 
-    if not roomsvc.ban_user(room_token, target_user):
+    if not roomsvc.ban_user(room_token, ban_username):
         raise NotFoundHTTPException("Пользователь не найден.")
 
 @router.post('/{room_token}/unban', status_code=status.HTTP_200_OK)
 def unban_user(
     moderator: depends.Moderator, username: depends.Username, role: depends.Role,
-    room_token: schema.RoomToken = Path(...), target_user: schema.Username = Body(embed=True)
+    room_token: schema.RoomToken = Path(...), unban_username: schema.Username = Body(embed=True)
 ):
     """Разбанить пользователя."""
 
     _check_room_owner(room_token, username, role)
 
-    if not roomsvc.unban_user(room_token, target_user):
+    if not roomsvc.unban_user(room_token, unban_username):
         raise NotFoundHTTPException("Пользователь не найден.")
 
 @router.post('/{room_token}/teams', status_code=status.HTTP_201_CREATED)

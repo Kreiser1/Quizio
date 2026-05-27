@@ -1,5 +1,5 @@
 from typing import Annotated
-from fastapi import APIRouter, Depends, Response, Header, status, Cookie
+from fastapi import APIRouter, Depends, Response, Header, status, Cookie, Body
 
 import security, schema, depends, config
 from exceptions import *
@@ -56,53 +56,50 @@ def login(
 
     return schema.Tokens(access_token=access_token, refresh_token=refresh_token)
 
-@router.post('/refresh', response_model=schema.Tokens)
-def refresh(
-    session: depends.Session,
-    refresh_token: depends.RefreshToken,
-    response: Response,
-    cooldown: depends.Cooldown
-) -> schema.Tokens:
-    """Обновление токенов авторизации в куках."""
-
-    access_token = security.refresh(session, refresh_token)
-    
-    if not access_token:
-        raise UnauthorizedHTTPException("Ошибка при авторизации. Проверьте токен.")
-
-    response.set_cookie(
-        key=security.ACCESS_COOKIE,
-        value=access_token,
-        httponly=True,
-        samesite='lax' if config.DEBUG else 'none',
-        secure=not config.DEBUG
-    )
-
-    return schema.Tokens(access_token=access_token)
-
 @router.post('/logout', status_code=status.HTTP_200_OK)
 def logout(
     session: depends.Session,
+    username: depends.Username,
     response: Response,
-    refresh_token: depends.RefreshToken,
-    cooldown: depends.Cooldown
+    cooldown: depends.Cooldown,
+    refresh_token_body: Annotated[schema.RefreshToken | None, Body(..., alias='refresh_token')] = None,
+    refresh_token_cookie: Annotated[str | None, Cookie(alias=security.REFRESH_COOKIE)] = None,
+    refresh_token: Annotated[str | None, Header()] = None
 ):
     """Выход из системы, удаление сессии и очистка куков."""
+
+    refresh_token = refresh_token_body or refresh_token_cookie or refresh_token
+
+    if not refresh_token:
+        return BadRequestHTTPException("Токен авторизации не предоставлен.")
+
+    try:
+        refresh_token = TypeAdapter(schema.RefreshToken).validate_python(refresh_token)
+    except schema.ValidationError:
+        return UnprocessableHTTPException("Неверный формат токена авторизации.")
+
+    print(refresh_token)
+    print(tuple(map(lambda user_session: user_session[0], security.sessions(session, username))))
+
+    if refresh_token not in tuple(map(lambda user_session: user_session[0], security.sessions(session, username))):
+        raise ForbiddenHTTPException("Вы не являетесь владельцем этого токена авторизации.")
 
     if security.logout(session, refresh_token):
         response.delete_cookie(security.ACCESS_COOKIE)
         response.delete_cookie(security.REFRESH_COOKIE)
     else:
-        raise UnauthorizedHTTPException()
+        raise UnknownHTTPException()
 
 @router.patch('/register', status_code=status.HTTP_200_OK)
 def update(
     session: depends.Session,
     username: depends.Username,
-    payload: schema.UserCredentialsUpdate,
-    cooldown: depends.Cooldown
+    payload: schema.UserCredentialsUpdate
 ):
     """Обновление пароля или E-mail авторизованного пользователя."""
+
+    if not payload.new_password and not payload.new_email:
+        return
     
     if not security.update(session, username, payload):
         raise ForbiddenHTTPException("Не удалось обновить данные пользователя. Проверьте пароль.")
@@ -110,6 +107,7 @@ def update(
 @router.get('/sessions', response_model=list[schema.UserSession])
 def sessions(session: depends.Session, username: depends.Username):
     return security.sessions(session, username)
+
 
 from typing import Annotated
 from fastapi import Body, status
@@ -119,14 +117,15 @@ from pydantic import TypeAdapter, ValidationError
 @router.post('/recover', status_code=status.HTTP_200_OK)
 def recover(
     session: depends.Session,
-    payload: Annotated[dict | str, Body()],
+    # payload: Annotated[dict | str, Body()],
     cooldown: depends.Cooldown
 ):
     """
-    Запрос на восстановление пароля пользователя.
-    1. Если передан JSON с username и email -> Инициирует сброс.
-    2. Если передана строка (токен) -> Производит сброс.
+    Запрос на восстановление пароля пользователя (закрыто до внедрения почтового сервера).
     """
+
+    # 1. Если передан JSON с username и email -> Инициирует сброс.
+    # 2. Если передана строка (токен) -> Производит сброс.
 
     raise NotImplementedHTTPException("Закрыто до внедрения почтового сервера.")
     
