@@ -16,7 +16,7 @@ def create_room(session: db.Session, username: schema.Username, payload: schema.
     if not quiz:
         return None
 
-    room_token = secrets.token_hex(4)
+    room_token = secrets.token_hex(3)
 
     if room_token in rooms:
         return None
