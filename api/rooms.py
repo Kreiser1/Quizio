@@ -229,6 +229,8 @@ async def room_stream(
 
     await websocket.accept()
 
+    role = security.get_role(session, username) or 'user'
+
     if room_token in roomsvc.rooms:
         user = next((user for user in roomsvc.rooms[room_token].users if user.username == username), None)
         if user and user.connection_state != 'banned':
@@ -243,13 +245,8 @@ async def room_stream(
                 await websocket.close()
                 break
                 
-            protected_stream = _mask_room_stream(room_stream, username)
-            
-            try:
-                validated_stream = schema.RoomStream.model_validate(protected_stream)
-                await websocket.send_json(validated_stream.model_dump(mode='json'))
-            except ValidationError as e:
-                await websocket.send_json({})
+            room_stream = room_stream if role in ('moderator', 'administrator') else _mask_room_stream(room_stream, username)
+            await websocket.send_json(room_stream.model_dump(mode='json'))
                 
             await asyncio.sleep(1.0 / config.FREQUENCY)
     except WebSocketDisconnect:
