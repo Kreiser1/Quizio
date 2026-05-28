@@ -7,17 +7,75 @@
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-    <div id="app">
-        <header>
-            <h1>Quizio</h1>
-        </header>
-        <main>
-            <div class="aut">
-                <input type="text" id="log in" placeholder="Логин">
-                <input type="text" id="password" placeholder="Пароль">
-                <button class="b1">Войти</button>
-            </div>
-        </main>
-    </div>
+     <div class="login-container">
+                <h1>Вход</h1>
+                <div class="input-group">
+                    <label>Логин</label>
+                    <input type="text" id="username" required>
+                </div>
+                <div class="input-group">
+                    <label>Пароль</label>
+                    <input type="password" id="password" required>
+                </div>
+                <button onclick="login()">Войти</button>
+                <div class="message" id="message"></div>
+     </div>
+     <script>
+        async function login() {
+
+    const username = document.getElementById('username').value;
+    const password = document.getElementById('password').value;
+
+    const message = document.getElementById('message');
+
+    if (!username || !password) {
+
+        message.style.color = 'red';
+        message.innerText = 'Введите логин и пароль';
+
+        return;
+    }
+
+    try {
+
+        const response = await fetch('http://127.0.0.1:8000/auth/login', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            credentials: 'include',
+            body: JSON.stringify({
+                username: username,
+                password: password
+            })
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+
+            message.style.color = 'green';
+            message.innerText = 'Вход выполнен успешно';
+
+            console.log('Токены:', data);
+
+            // Перенаправление после входа
+            // window.location.href = '/profile.html';
+
+        } else {
+
+            message.style.color = 'red';
+            message.innerText = data.detail || 'Ошибка входа';
+        }
+
+    } catch (error) {
+
+        console.error(error);
+
+        message.style.color = 'red';
+        message.innerText = 'Ошибка подключения к серверу';
+    }
+}
+     </script>
 </body>
 </html>
