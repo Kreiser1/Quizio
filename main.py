@@ -76,3 +76,7 @@ def frontend(route: str):
         return FileResponse(path, media_type=media_type)
     
     return FileResponse(FRONTEND + '/index.html') if os.path.exists(FRONTEND + '/index.html') else Response(status_code=status.HTTP_404_NOT_FOUND)
+
+if __name__ == '__main__':
+    import uvicorn
+    uvicorn.run("main:app", port=80, reload=True)
