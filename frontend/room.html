@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="en" color-scheme="dark">
+    <head>
+        <meta charset="UTF-8" />
+        <title>Quizio</title>
+
+        <link rel="stylesheet" href="classless.css" />
+
+        <style>
+            body {
+                background: linear-gradient(
+                    135deg,
+                    #0f0c29 0%,
+                    #302b63 50%,
+                    #24243e 100%
+                );
+                background-size: cover;
+                background-attachment: fixed;
+            }
+
+            .grid {
+                display: grid;
+                grid-template-columns: repeat(6, 1fr);
+                grid-template-rows: repeat(4, 1fr);
+                gap: 20px;
+            }
+
+            .question {
+                grid-column: 1 / 5;
+                grid-row: 1 / 5;
+            }
+
+            .users {
+                grid-column: 5 / 7;
+                grid-row: 1 / 3;
+            }
+
+            .time {
+                grid-column: 5 / 7;
+                grid-row: 3 / 5;
+            }
+        </style>
+    </head>
+
+    <body class="grid">
+        <section class="glass question">
+            <h3 id="room-name">Комната...</h3>
+            <p id="question-text"></p>
+        </section>
+        <section class="glass users">
+            <table>
+                <thead>
+                    <th>Имя</th>
+                    <th>Очки</th>
+                </thead>
+                <tbody id="room-users"></tbody>
+            </table>
+        </section>
+        <section class="glass time">
+            <h1 id="question-time"></h1>
+        </section>
+
+        <script>
+            (function () {
+                const frontend = "http://" + window.location.hostname;
+                const ws = "ws://" + window.location.hostname + "/api";
+
+                const room_name = document.getElementById("room-name");
+                const question_text = document.getElementById("question-text");
+                const room_users = document.getElementById("room-users");
+                const question_time = document.getElementById("question-time");
+
+                const query = Object.fromEntries(
+                    new URLSearchParams(window.location.search).entries(),
+                );
+
+                if (!query.room_token) {
+                    room_name.innerText = "Ошибка";
+                    return;
+                }
+
+                const socket = new WebSocket(
+                    ws + `/rooms/${query.room_token}/stream`,
+                );
+
+                socket.onmessage = (event) => {
+                    try {
+                        const room_stream = JSON.parse(event.data);
+
+                        room_name.innerText = room_stream.title;
+                        question_time.innerText = room_stream.question_time;
+                        question_text.innerText = room_stream.question_text;
+
+                        const users = room_stream.users.map(
+                            ({ username, score }) => ({
+                                username,
+                                score,
+                            }),
+                        );
+
+                        room_users.innerHTML = "";
+
+                        for (user of room_stream.users) {
+                            let row = room_users.insertRow();
+                            row.insertCell(0).textContent = user.username;
+                            row.insertCell(1).textContent = user.score;
+                        }
+                    } catch (error) {}
+                };
+
+                socket.onerror = (error) => (window.location.href = frontend);
+
+                socket.onclose = () => (window.location.href = frontend);
+            })();
+        </script>
+    </body>
+</html>

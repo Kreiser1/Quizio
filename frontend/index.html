@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="en" color-scheme="dark">
+    <head>
+        <meta charset="UTF-8" />
+        <title>Quizio</title>
+
+        <link rel="stylesheet" href="classless.css" />
+
+        <style>
+            body {
+                background: linear-gradient(
+                    135deg,
+                    #0f0c29 0%,
+                    #302b63 50%,
+                    #24243e 100%
+                );
+                background-size: cover;
+                background-attachment: fixed;
+            }
+
+            .grid {
+                display: grid;
+                grid-template: 1fr / 1fr 1fr;
+                gap: 20px;
+            }
+        </style>
+    </head>
+
+    <body>
+        <main class="grid">
+            <section class="glass">
+                <h3>Комнаты</h3>
+                <table>
+                    <thead>
+                        <th>Имя</th>
+                        <th>Билет</th>
+                    </thead>
+                    <tbody id="rooms"></tbody>
+                </table>
+                <br />
+                <button onclick="search_rooms()">Search</button>
+            </section>
+            <section class="glass">
+                <input type="text" id="username" />
+                <input type="password" id="password" />
+                <button class="success" onclick="login()">Login</button>
+                <button class="error" onclick="logout()">Logout</button>
+                <p id="auth"></p>
+            </section>
+        </main>
+
+        <script>
+            const frontend = "http://" + window.location.hostname;
+            const api = "http://" + window.location.hostname + "/api";
+
+            function login() {
+                const username = document.getElementById("username").value;
+                const password = document.getElementById("password").value;
+                const auth = document.getElementById("auth");
+
+                fetch(api + "/auth/login", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({
+                        username: username,
+                        password: password,
+                    }),
+                })
+                    .then((response) => {
+                        if (!response.ok)
+                            throw new Error(
+                                `${response.status} (${response.statusText}).`,
+                            );
+
+                        auth.innerText = "Success.";
+                    })
+                    .catch((error) => {
+                        auth.innerText = error;
+                    });
+            }
+
+            function logout() {
+                fetch(api + "/auth/logout", {
+                    method: "POST",
+                    credentials: "include",
+                })
+                    .then((response) => {
+                        if (!response.ok)
+                            throw new Error(
+                                `${response.status} (${response.statusText}).`,
+                            );
+
+                        auth.innerText = "Success.";
+                    })
+                    .catch((error) => {
+                        auth.innerText = error;
+                    });
+            }
+
+            function search_rooms() {
+                const rooms_table = document.getElementById("rooms");
+                rooms_table.innerHTML = "";
+
+                fetch(api + "/rooms/query")
+                    .then((response) => {
+                        if (!response.ok)
+                            throw new Error(
+                                `${response.status} (${response.statusText}).`,
+                            );
+
+                        return response.json();
+                    })
+                    .then((json) => {
+                        const rooms = json.map(({ title, room_token }) => ({
+                            title,
+                            room_token,
+                        }));
+
+                        for (room of rooms) {
+                            let row = rooms_table.insertRow();
+                            row.insertCell(0).innerHTML =
+                                `<a href="${frontend + "/room.html?room_token=" + room.room_token}">${room.title}</a>`;
+                            row.insertCell(1).textContent = room.room_token;
+                        }
+                    })
+                    .catch((error) => {
+                        rooms_table.innerHTML = error;
+                    });
+            }
+
+            search_rooms();
+        </script>
+    </body>
+</html>
