@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Регистрация - Quizio</title>
+    <>
+</head>
+<body>
+<div class="register-container">
+
+    <h1>Регистрация</h1>
+
+    <div class="input-group">
+        <label>Логин *</label>
+        <input type="text" id="username" required>
+    </div>
+
+    <div class="input-group">
+        <label>Пароль</label>
+        <input type="password" id="password" required>
+    </div>
+
+    <div class="input-group">
+        <label>Аватар (изображение)</label>
+        <input type="file" id="avatar" accept="image/*">
+    </div>
+
+    <div class="preview" id="preview"></div>
+
+    <button onclick="register()">Создать аккаунт</button>
+
+    <div class="message" id="message"></div>
+</div>
+<script>
+    document.getElementById('avatar').addEventListener('change', function(event) {
+
+    const file = event.target.files[0];
+
+    if (!file) return;
+
+    const reader = new FileReader();
+
+    reader.onload = function(e) {
+
+        document.getElementById('preview').innerHTML = `
+            <img src="${e.target.result}" alt="Аватар">
+        `;
+    };
+
+    reader.readAsDataURL(file);
+});
+
+async function register() {
+
+    const username = document.getElementById('username').value;
+    const password = document.getElementById('password').value;
+    const avatarFile = document.getElementById('avatar').files[0];
+
+    const message = document.getElementById('message');
+
+    if (!username || !password) {
+
+        message.style.color = 'red';
+        message.innerText = 'Заполните обязательные поля';
+
+        return;
+    }
+
+    const formData = new FormData();
+
+    formData.append('username', username);
+    formData.append('password', password);
+
+    if (avatarFile) {
+        formData.append('avatar', avatarFile);
+    }
+
+    try {
+
+        const response = await fetch('http://127.0.0.1:8000/auth/register', {
+            method: 'POST',
+            body: formData
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+
+            message.style.color = 'green';
+            message.innerText = 'Аккаунт успешно создан';
+
+            console.log(data);
+
+        } else {
+
+            message.style.color = 'red';
+            message.innerText = data.detail || 'Ошибка регистрации';
+        }
+
+    } catch (error) {
+
+        console.error(error);
+
+        message.style.color = 'red';
+        message.innerText = 'Ошибка подключения к серверу';
+    }
+}
+</script>
+</body>
+</html>
