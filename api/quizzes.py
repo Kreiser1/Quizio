@@ -89,7 +89,7 @@ def update_quiz(
         
         try:
             payload = schema.QuizCreate(title=quiz.title, icon=quiz.icon, questions=schema.Quiz.from_yaml(payload), tags=quiz.tags)
-        except schema.YAMLError:
+        except schema.YAMLError, schema.ValidationError:
             raise UnprocessableHTTPException("Некорректный формат YAML.")
     else:
         if isinstance(payload.icon, str) and len(payload.icon) > config.IMAGE_SIZE_LIMIT:

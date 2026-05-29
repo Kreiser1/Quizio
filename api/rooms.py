@@ -6,6 +6,7 @@ from pydantic import ValidationError
 import schema
 import depends
 import roomsvc
+import usersvc
 import config
 import security
 from exceptions import *
@@ -76,25 +77,30 @@ def search_rooms(
 
     return roomsvc.search_rooms(query=query, count=count, offset=offset, force=(role == 'administrator' or role=='moderator'))
 
-@router.get('/{room_token}', status_code=status.HTTP_200_OK)
-def join_room(
-    username: depends.Username,
+@router.get('/{room_token}', response_model=schema.Room)
+def get_room(
+    moderator: depends.Moderator,
     room_token: schema.RoomToken = Path(...)
-):
-    """Присоединиться к комнате."""
+) -> schema.Room:
+    """Получить данные комнаты."""
 
-    if not roomsvc.join_room(room_token, username):
-        raise ForbiddenHTTPException("Вы забанены или комната не существует.")
+    room = roomsvc.get_room(room_token)
+
+    if not room:
+        raise NotFoundHTTPException("Не удалось найти комнату.")
+    
+    return room
 
 @router.post('/{room_token}/answer', status_code=status.HTTP_200_OK)
 def submit_answer(
     username: depends.Username,
+    role: depends.Role,
     room_token: schema.RoomToken = Path(...),
     payload: schema.Answer = Body(...)
 ) -> bool:
     """Отправить ответ."""
 
-    return roomsvc.submit_answer(room_token, username, payload)
+    return roomsvc.submit_answer(room_token, username, payload, (role == 'moderator' or role == 'administrator'))
 
 @router.post('/{room_token}/control', status_code=status.HTTP_200_OK)
 def control_room(
@@ -223,7 +229,15 @@ async def room_stream(
         await websocket.close(code=1008, reason=UnauthorizedHTTPException().detail)
         return
     
-    if not roomsvc.join_room(room_token, username):
+    role = security.get_role(session, username) or 'user'
+    full_name = None
+
+    profile = usersvc.get_profile(session, username)
+    
+    if profile and profile.full_name:
+        full_name = profile.full_name
+
+    if not roomsvc.join_room(room_token, username, full_name, (role == 'moderator' or role == 'administrator')):
         await websocket.close(code=1008, reason=ForbiddenHTTPException().detail)
         return
 

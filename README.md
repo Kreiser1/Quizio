@@ -37,5 +37,5 @@ git pull
 Команда для запуска:
 
 ```
-fastapi dev
+py main.py
 ```

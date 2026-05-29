@@ -62,13 +62,15 @@ def logout(
     username: depends.Username,
     response: Response,
     cooldown: depends.Cooldown,
-    refresh_token_body: Annotated[schema.RefreshToken | None, Body(..., alias='refresh_token')] = None,
+    refresh_token_body: Annotated[schema.RefreshToken | None, Body(...)] = None,
     refresh_token_cookie: Annotated[str | None, Cookie(alias=security.REFRESH_COOKIE)] = None,
     refresh_token: Annotated[str | None, Header()] = None
 ):
     """Выход из системы, удаление сессии и очистка куков."""
 
     refresh_token = refresh_token_body or refresh_token_cookie or refresh_token
+
+    print(refresh_token)
 
     if not refresh_token:
         return BadRequestHTTPException("Токен авторизации не предоставлен.")
@@ -85,8 +87,9 @@ def logout(
         raise ForbiddenHTTPException("Вы не являетесь владельцем этого токена авторизации.")
 
     if security.logout(session, refresh_token):
-        response.delete_cookie(security.ACCESS_COOKIE)
-        response.delete_cookie(security.REFRESH_COOKIE)
+        if refresh_token_cookie == refresh_token:
+            response.delete_cookie(security.ACCESS_COOKIE)
+            response.delete_cookie(security.REFRESH_COOKIE)
     else:
         raise UnknownHTTPException()
 

@@ -32,6 +32,12 @@ def create_room(session: db.Session, username: schema.Username, payload: schema.
     )
     return room_token
 
+def get_room(room_token: schema.RoomToken) -> schema.Room | None:
+    if room_token not in rooms:
+        return None
+    
+    return rooms[room_token]
+
 def update_room(session: db.Session, room_token: schema.RoomToken, payload: schema.RoomCreate) -> bool:
     if room_token not in rooms:
         return False
@@ -55,7 +61,7 @@ def update_room(session: db.Session, room_token: schema.RoomToken, payload: sche
     
     return True
 
-def join_room(room_token: schema.RoomToken, username: schema.Username) -> bool:
+def join_room(room_token: schema.RoomToken, username: schema.Username, full_name: schema.FullName | None = None, force: bool = False) -> bool:
     if room_token not in rooms:
         return False
 
@@ -63,10 +69,13 @@ def join_room(room_token: schema.RoomToken, username: schema.Username) -> bool:
     user = next((user for user in room.users if user.username == username), None)
 
     if user:
+        if force:
+            return True
         return not user.connection_state == 'banned'
 
     new_user = schema.RoomUser(
         username=username,
+        full_name=full_name,
         connection_state='disconnected',
         score=0,
         answers_streak=0,
@@ -112,14 +121,14 @@ def search_rooms(query: schema.Title | None = None, count: schema.Count = 25, of
 
     return rooms_found[offset : offset + count]
 
-def submit_answer(token: schema.RoomToken, username: schema.Username, payload: schema.Answer) -> bool:
+def submit_answer(token: schema.RoomToken, username: schema.Username, payload: schema.Answer, force: bool = False) -> bool:
     if token not in rooms:
         return False
 
     room = rooms[token]
     user = next((user for user in room.users if user.username == username), None)
     
-    if not user or user.connection_state == 'banned' or payload.question != room.current_question:
+    if not user or (not force and user.connection_state == 'banned') or payload.question != room.current_question:
         return False
 
     try:

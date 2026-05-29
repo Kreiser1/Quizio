@@ -168,6 +168,7 @@ class Quiz(BaseModel):
 
 class RoomUser(BaseModel):
     username: Username
+    full_name: FullName | None = None
     connection_state: Literal['connected', 'disconnected', 'banned']
     score: Count
     answers_streak: Count
