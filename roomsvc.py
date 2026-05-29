@@ -76,14 +76,14 @@ def join_room(room_token: schema.RoomToken, username: schema.Username) -> bool:
     room.users.add(new_user)
     return True
 
-def search_rooms(query: schema.Title | None = None, count: schema.Count = 25, offset: schema.Index = 0) -> list[schema.RoomPreview]:
+def search_rooms(query: schema.Title | None = None, count: schema.Count = 25, offset: schema.Index = 0, force: bool = False) -> list[schema.RoomPreview]:
     rooms_found = []
 
     if query:
         query = query.strip().lower()
 
     for token, room in rooms.items():
-        if room.privacy != "public":
+        if not force and room.privacy != "public":
             continue
 
         if query:

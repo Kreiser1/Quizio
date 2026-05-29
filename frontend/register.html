@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Quizio - Регистрация</title>
+    </head>
+    <link rel="stylesheet" href="style.css" />
+    <script src="utils.js"></script>
+    <body>
+        <section class="nav glass">
+            <h1><label>Quizio</label></h1>
+        </section>
+        <section class="main glass">
+            <input
+                type="text"
+                id="username"
+                placeholder="Имя пользователя"
+                required
+            />
+            <input
+                type="password"
+                id="password"
+                placeholder="Пароль"
+                required
+            />
+            <input type="email" id="email" placeholder="Электронная почта" />
+            <span>
+                <button class="success" onclick="register()">
+                    Регистрация
+                </button>
+                <button onclick="redirect('/login.html')">Вход</button>
+            </span>
+            <hr />
+            <label style="color: red" id="error"></label>
+            <script>
+                const error_msg = get_element("error");
+
+                function register() {
+                    error_msg.innerText = "";
+
+                    let email = get_element("email").value;
+                    email = email == "" ? null : email;
+
+                    request_json(
+                        "/auth/register",
+                        "POST",
+                        {
+                            username: get_element("username").value,
+                            password: get_element("password").value,
+                            email: email,
+                        },
+                        (response) => redirect(""),
+                        (error) => {
+                            error_msg.innerText = error;
+                        },
+                    );
+                }
+            </script>
+        </section>
+    </body>
+</html>

@@ -67,14 +67,14 @@ def update_room(
 
 @router.get('/query', response_model=list[schema.RoomPreview], status_code=status.HTTP_200_OK)
 def search_rooms(
-    moderator: depends.Moderator,
+    role: depends.Role,
     query: schema.Title | None = Query(default=None),
     count: schema.Count = Query(default=25),
     offset: schema.Index = Query(default=0)
 ) -> list[schema.RoomPreview]:
-    """Поиск открытых комнат."""
+    """Поиск комнат."""
 
-    return roomsvc.search_rooms(query=query, count=count, offset=offset)
+    return roomsvc.search_rooms(query=query, count=count, offset=offset, force=(role == 'administrator' or role=='moderator'))
 
 @router.get('/{room_token}', status_code=status.HTTP_200_OK)
 def join_room(
