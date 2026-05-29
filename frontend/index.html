@@ -1,0 +1,304 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Quizio - Главная</title>
+</head>
+<link rel="stylesheet" href="style.css" />
+<script src="utils.js"></script>
+
+<body>
+    <section class="nav glass">
+        <h1><a href="/">Quizio</a></h1>
+    </section>
+    <section class="profile glass">
+        <img id="profile-avatar" style="width: 64px; height: 64px" />
+        <a id="profile-name" href="/profile.html"></a>
+    </section>
+    <section class="main glass" style="
+                display: grid;
+                grid-template-rows: 1fr auto;
+                justify-content: stretch;
+                align-items: start;
+                min-height: 0;
+            ">
+        <div class="scroll" style="overflow-x: auto;">
+            <label>
+                <h4>Комнаты</h4>
+            </label>
+            <table style="width: 100%; min-width: 600px;">
+                <thead>
+                    <tr>
+                        <th style="width: 64px;"></th>
+                        <th>Название</th>
+                        <th>Билет</th>
+                        <th>Викторина</th>
+                        <th>Владелец</th>
+                        <th>Игроков</th>
+                        <th>Статус</th>
+                    </tr>
+                </thead>
+                <tbody id="rooms"></tbody>
+            </table>
+            <label style="color: red" id="rooms-error"></label>
+        </div>
+        <div style="display: flex; flex-direction: row; gap: 5px; align-items: center; padding: 10px 0;">
+            <input type="search" id="search-query" placeholder="Поиск..." />
+            <input type="number" min="0" value="" id="search-count" placeholder="Количество" />
+            <input type="number" min="0" value="" id="search-offset" placeholder="Страница" />
+            <button id="create-room-btn" class="success" style="display: none;">Создать
+                комнату</button>
+        </div>
+    </section>
+    <section class="side glass scroll">
+        <label>
+            <h4>Достижения</h4>
+        </label>
+        <table>
+            <tbody id="achievements"></tbody>
+        </table>
+        <label style="color: red" id="achievements-error"></label>
+    </section>
+    <script>
+        let currentUserRole = 'user';
+        let roomsLoaded = false;
+        let achievementsLoaded = false;
+        let roomsLoading = false;
+        let searchTimeout = null;
+
+        document.addEventListener('DOMContentLoaded', function () {
+            load_profile();
+
+            if (!achievementsLoaded) {
+                load_achievements();
+                achievementsLoaded = true;
+            }
+
+            if (!roomsLoaded) {
+                load_rooms();
+                roomsLoaded = true;
+            }
+
+            // Replace onchange with input event with debounce
+            const searchInputs = ['search-query', 'search-count', 'search-offset'];
+            searchInputs.forEach(id => {
+                const input = document.getElementById(id);
+                if (input) {
+                    // Remove inline onchange handlers
+                    input.removeAttribute('onchange');
+
+                    // Add input event with debounce for search-query
+                    if (id === 'search-query') {
+                        input.addEventListener('input', function () {
+                            clearTimeout(searchTimeout);
+                            searchTimeout = setTimeout(() => {
+                                load_rooms();
+                            }, 500); // 500ms debounce
+                        });
+                    } else {
+                        // Immediate change for number inputs
+                        input.addEventListener('change', function () {
+                            load_rooms();
+                        });
+                    }
+
+                    // Add Enter key support
+                    input.addEventListener('keypress', function (e) {
+                        if (e.key === 'Enter') {
+                            e.preventDefault();
+                            clearTimeout(searchTimeout);
+                            load_rooms();
+                        }
+                    });
+                }
+            });
+
+            // Create room button
+            const createRoomBtn = document.getElementById('create-room-btn');
+            if (createRoomBtn) {
+                createRoomBtn.addEventListener('click', function () {
+                    window.location.href = '/create-room.html';
+                });
+            }
+        });
+
+        function load_profile() {
+            const profile_name = document.getElementById("profile-name");
+
+            request_json(
+                "/users/me",
+                "GET",
+                null,
+                (response) => {
+                    document.getElementById("profile-name").innerText =
+                        response.full_name ?? response.username;
+
+                    // Store user role
+                    currentUserRole = response.role;
+
+                    if (response.role == "administrator") {
+                        profile_name.style.color = "red";
+                    } else if (response.role == "moderator") {
+                        profile_name.style.color = "yellow";
+                    }
+
+                    // Show create room button for moderators and administrators
+                    const createRoomBtn = document.getElementById('create-room-btn');
+                    if (createRoomBtn && (response.role === 'moderator' || response.role === 'administrator')) {
+                        createRoomBtn.style.display = 'inline-block';
+                    }
+
+                    if (typeof response.avatar == "number") {
+                        document.getElementById("profile-avatar").src = load_preset(response.avatar);
+                    } else if (typeof response.avatar == "string") {
+                        document.getElementById("profile-avatar").src = "data:image/png;base64," + response.avatar;
+                    } else {
+                        document.getElementById("profile-avatar").src = load_preset(1);
+                    }
+                },
+                (error) => redirect("/login.html"),
+            );
+        }
+
+        function load_achievements() {
+            const achievements = document.getElementById("achievements");
+            const achievements_error_msg = document.getElementById("achievements-error");
+
+            achievements_error_msg.innerText = "";
+
+            request_json(
+                "/achievements",
+                "GET",
+                null,
+                (response) => {
+                    achievements.innerHTML = '';
+
+                    if (!response || response.length === 0) {
+                        const row = achievements.insertRow();
+                        const cell = row.insertCell();
+                        cell.colSpan = 2;
+                        cell.innerText = "Нет достижений";
+                        cell.style.textAlign = "center";
+                        cell.style.padding = "20px";
+                        return;
+                    }
+
+                    for (const achievement of response) {
+                        const row = achievements.insertRow();
+                        const src = typeof achievement.icon == "number"
+                            ? load_preset(achievement.icon)
+                            : "data:image/png;base64," + achievement.icon;
+                        row.insertCell().innerHTML = `<img style="width: 64px; height: 64px" src="${src}" alt="${achievement.title}" />`;
+                        row.insertCell().innerHTML = `<label>${achievement.title}</label>`;
+                    }
+                },
+                (error) => {
+                    achievements_error_msg.innerText = error;
+                },
+            );
+        }
+
+        function load_rooms() {
+            // Prevent multiple simultaneous requests
+            if (roomsLoading) {
+                return;
+            }
+
+            const rooms = document.getElementById("rooms");
+            const rooms_error_msg = document.getElementById("rooms-error");
+
+            roomsLoading = true;
+            rooms.innerHTML = "";
+            rooms_error_msg.innerText = "";
+
+            // Build query parameters
+            const params = new URLSearchParams();
+
+            const query = document.getElementById("search-query").value.trim();
+            if (query) {
+                params.append("query", query);
+            }
+
+            const count = document.getElementById("search-count").value;
+            if (count) {
+                params.append("count", count);
+            }
+
+            const offset = document.getElementById("search-offset").value;
+            if (offset) {
+                // Calculate actual offset based on page number
+                const pageSize = count || 25;
+                const pageNumber = parseInt(offset) || 0;
+                params.append("offset", pageNumber * pageSize);
+            }
+
+            const queryString = params.toString();
+            const url = queryString ? `/rooms/query?${queryString}` : "/rooms/query";
+
+            request_json(
+                url,
+                "GET",
+                null,
+                (response) => {
+                    if (!response || response.length === 0) {
+                        const row = rooms.insertRow();
+                        const cell = row.insertCell();
+                        cell.colSpan = 7;
+                        cell.innerText = "Нет доступных комнат";
+                        cell.style.textAlign = "center";
+                        cell.style.padding = "20px";
+                        roomsLoading = false;
+                        return;
+                    }
+
+                    for (const room of response) {
+                        const row = rooms.insertRow();
+
+                        // Icon column
+                        const src = typeof room.quiz.icon == "number"
+                            ? load_preset(room.quiz.icon)
+                            : "data:image/png;base64," + room.quiz.icon;
+                        row.insertCell().innerHTML = `<img style="width: 64px; height: 64px" src="${src}" alt="${room.quiz.title}" />`;
+
+                        // Title column
+                        const titleCell = row.insertCell();
+                        titleCell.innerHTML = `<label>${room.title}</label>`;
+                        if (room.privacy === "private") {
+                            titleCell.innerHTML += ' 🔒';
+                        }
+
+                        // Room token column
+                        const tokenCell = row.insertCell();
+                        tokenCell.innerHTML = `<a href="/room.html?room_token=${room.room_token}" style="white-space: nowrap;">${room.room_token}</a>`;
+                        tokenCell.style.wordBreak = 'break-all';
+
+                        // Quiz title column
+                        row.insertCell().innerHTML = `<label>${room.quiz.title}</label>`;
+
+                        // Owner column - use full_name if available
+                        const ownerCell = row.insertCell();
+                        ownerCell.innerHTML = `<label>${room.owner_full_name || room.owner}</label>`;
+
+                        // Players count column
+                        row.insertCell().innerHTML = `<label>${room.users_count}</label>`;
+
+                        // Status column
+                        const statusCell = row.insertCell();
+                        const statusText = room.state === "active" ? "Активна" : "Ожидание";
+                        statusCell.innerHTML = `<label style="color: ${room.state === 'active' ? 'green' : 'orange'}">${statusText}</label>`;
+                    }
+
+                    roomsLoading = false;
+                },
+                (error) => {
+                    rooms_error_msg.innerText = error;
+                    roomsLoading = false;
+                },
+            );
+        }
+    </script>
+</body>
+
+</html>

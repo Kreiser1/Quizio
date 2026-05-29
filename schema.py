@@ -84,7 +84,7 @@ class UserRegistration(BaseModel):
 
 class UserUpdate(BaseModel):
     full_name: FullName | None = None
-    avatar: Index | Base64 = 0
+    avatar: Index | Base64 | None = None
 
 
 class UserRecovery(BaseModel):
@@ -117,7 +117,7 @@ class Answer(BaseModel):
 class QuizPreview(BaseModel):
     id: Index
     title: Title
-    icon: Index | Base64 = 0
+    icon: Index | Base64 = 1
     creation_time: DateTime
     tags: set[Tag] | None = None
     authors: set[Username]
@@ -125,14 +125,14 @@ class QuizPreview(BaseModel):
 
 class QuizCreate(BaseModel):
     title: Title
-    icon: Index | Base64 = 0
+    icon: Index | Base64 = 1
     questions: list[Question]
     tags: set[Tag] | None = None
 
 class Quiz(BaseModel):
     id: Index
     title: Title
-    icon: Index | Base64 = 0
+    icon: Index | Base64 = 1
     questions: list[Question]
     creation_time: DateTime
     edit_time: DateTime | None = None
@@ -272,14 +272,14 @@ class RoomControl(BaseModel):
 
 class AchievementCreate(BaseModel):
     title: Title
-    icon: Index | Base64 = 0
+    icon: Index | Base64 = 2
     condition: Code
 
 
 class Achievement(BaseModel):
     id: Index
     title: Title
-    icon: Index | Base64 = 0
+    icon: Index | Base64 = 2
     condition: Code
 
 

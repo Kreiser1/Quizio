@@ -65,7 +65,7 @@ class Quiz(Base):
     
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     title: Mapped[str] = mapped_column(String(128), nullable=False)
-    icon: Mapped[str] = mapped_column(Text(), default='0')
+    icon: Mapped[str] = mapped_column(Text(), default='1')
     creation_time: Mapped[str] = mapped_column(String(32), nullable=False)
     edit_time: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
     last_edit_username: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
@@ -100,7 +100,7 @@ class Achievement(Base):
     
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     title: Mapped[str] = mapped_column(String(128), nullable=False)
-    icon: Mapped[str] = mapped_column(Text(), default='0')
+    icon: Mapped[str] = mapped_column(Text(), default='2')
     condition: Mapped[str] = mapped_column(Text, nullable=False)
 
     users: Mapped[list["User"]] = relationship(
