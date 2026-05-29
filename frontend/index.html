@@ -1,160 +1,256 @@
 <!doctype html>
 <html lang="en">
-    <head>
-        <meta charset="UTF-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <title>Quizio - Главная</title>
-    </head>
-    <link rel="stylesheet" href="style.css" />
-    <script src="utils.js"></script>
-    <body>
-        <section class="nav glass">
-            <h1><label>Quizio</label></h1>
-        </section>
-        <section class="profile glass">
-            <img id="profile-avatar" style="width: 64px; height: 64px" />
-            <a id="profile-name" href="/profile.html"></a>
-        </section>
-        <section
-            class="main glass"
-            style="
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Quizio - Главная</title>
+</head>
+<link rel="stylesheet" href="style.css" />
+<script src="utils.js"></script>
+
+<body>
+    <section class="nav glass">
+        <h1><a href="/">Quizio</a></h1>
+    </section>
+    <section class="profile glass">
+        <img id="profile-avatar" style="width: 64px; height: 64px" />
+        <a id="profile-name" href="/profile.html" style="margin-left: 10px;"></a>
+    </section>
+    <section class="main glass" style="
                 display: grid;
                 grid-template-rows: 4fr 1fr;
                 justify-content: stretch;
                 align-items: start;
-            "
-        >
-            <div class="scroll">
-                <label><h3>Комнаты</h3></label>
-                <table>
-                    <thead>
+            ">
+        <div class="scroll">
+            <label>
+                <h4>Комнаты</h4>
+            </label>
+            <table>
+                <thead>
+                    <tr>
                         <th></th>
                         <th>Название</th>
                         <th>Билет</th>
                         <th>Викторина</th>
                         <th>Владелец</th>
-                    </thead>
-                    <tbody id="rooms"></tbody>
-                </table>
-                <label style="color: red" id="rooms-error"></label>
-            </div>
-            <div style="display: flex; flex-direction: row; gap: 5px">
-                <input type="text" id="search-query" placeholder="Название" />
-                <input
-                    type="number"
-                    placeholder="Начать с..."
-                    min="0"
-                    max="25"
-                    id="search-offset"
-                    value="0"
-                    required
-                />
-                <input
-                    type="range"
-                    min="1"
-                    max="25"
-                    value="5"
-                    id="search-count"
-                    required
-                />
-                <button onclick="load_rooms()">🔍</button>
-            </div>
-        </section>
-        <section class="side glass scroll">
-            <table>
-                <tbody id="achievements"></tbody>
+                        <th>Игроков</th>
+                        <th>Статус</th>
+                    </tr>
+                </thead>
+                <tbody id="rooms"></tbody>
             </table>
-            <label style="color: red" id="achievements-error"></label>
-        </section>
-        <script>
-            function load_profile() {
-                const profile = request_json(
-                    "/users/me",
-                    "GET",
-                    null,
-                    (response) => {
-                        get_element("profile-name").innerText =
-                            response.full_name ?? response.username;
+            <label style="color: red" id="rooms-error"></label>
+        </div>
+        <div style="display: flex; flex-direction: row; gap: 5px; align-items: center;">
+            <input onchange="load_rooms()" type="search" id="search-query" placeholder="Поиск..." />
+            <input onchange="load_rooms()" type="number" min="0" value="" id="search-count" placeholder="Количество" />
+            <input onchange="load_rooms()" type="number" min="0" value="" id="search-offset" placeholder="Страница" />
+            <button id="create-room-btn" class="success" style="display: none;">Создать комнату</button>
+        </div>
+    </section>
+    <section class="side glass scroll">
+        <label>
+            <h4>Достижения</h4>
+        </label>
+        <table>
+            <tbody id="achievements"></tbody>
+        </table>
+        <label style="color: red" id="achievements-error"></label>
+    </section>
+    <script>
+        let currentUserRole = 'user';
 
-                        if (typeof response.avatar == "number")
-                            get_element("profile-avatar").src = load_preset(
-                                response.avatar,
-                            );
-                        else if (typeof response.avatar == "string")
-                            get_element("profile-avatar").src =
-                                "data:image/png;base64," + response.avatar;
-                        else get_element("profile-avatar").src = load_preset(1);
-                    },
-                    (error) => redirect("/login.html"),
-                );
-            }
-
+        document.addEventListener('DOMContentLoaded', function () {
             load_profile();
-
-            const achievements_error_msg = get_element("achievements-error");
-
-            function load_achievements() {
-                const achievements = get_element("achievements");
-
-                achievements_error_msg.innerText = "";
-
-                const profile = request_json(
-                    "/achievements",
-                    "GET",
-                    null,
-                    (response) => {
-                        for (const achievement of response) {
-                            const row = achievements.insertRow();
-                            const src =
-                                typeof achievement.icon == "number"
-                                    ? load_preset(achievement.icon)
-                                    : "data:image/png;base64," +
-                                      achievement.icon;
-                            row.insertCell().innerHTML = `<img style="width: 64px; height: 64px" src="${src}" />`;
-                            row.insertCell().innerHTML = `<label>${achievement.title}</label>`;
-                        }
-                    },
-                    (error) => (achievements_error_msg.innerText = error),
-                );
-            }
-
             load_achievements();
+            load_rooms();
 
-            const rooms_error_msg = get_element("rooms-error");
-
-            function load_rooms() {
-                const rooms = get_element("rooms");
-
-                rooms.innerHTML = "";
-
-                let query = get_element("search-query").value;
-                query = query == "" ? null : "query=" + query + "&";
-
-                rooms_error_msg.innerText = "";
-
-                const profile = request_json(
-                    `/rooms/query?${query ?? ""}offset=${get_element("search-offset").value}&count=${get_element("search-count").value}`,
-                    "GET",
-                    null,
-                    (response) => {
-                        for (const room of response) {
-                            const row = rooms.insertRow();
-                            const src =
-                                typeof room.quiz.icon == "number"
-                                    ? load_preset(room.quiz.icon)
-                                    : "data:image/png;base64," + room.quiz.icon;
-                            row.insertCell().innerHTML = `<img style="width: 64px; height: 64px" src="${src}" />`;
-                            row.insertCell().innerHTML = `<label>${room.title}</label>`;
-                            row.insertCell().innerHTML = `<a href="${frontend}/room.html?room_token=${room.room_token}">${room.room_token}</label>`;
-                            row.insertCell().innerHTML = `<label>${room.quiz.title}</label>`;
-                            row.insertCell().innerHTML = `<label>${room.owner}</label>`;
+            // Add Enter key support for search inputs
+            const searchInputs = ['search-query', 'search-count', 'search-offset'];
+            searchInputs.forEach(id => {
+                const input = document.getElementById(id);
+                if (input) {
+                    input.addEventListener('keypress', function (e) {
+                        if (e.key === 'Enter') {
+                            load_rooms();
                         }
-                    },
-                    (error) => (rooms_error_msg.innerText = error),
-                );
+                    });
+                }
+            });
+
+            // Create room button
+            const createRoomBtn = document.getElementById('create-room-btn');
+            if (createRoomBtn) {
+                createRoomBtn.addEventListener('click', function () {
+                    window.location.href = '/create-room.html';
+                });
+            }
+        });
+
+        function load_profile() {
+            const profile_name = document.getElementById("profile-name");
+
+            request_json(
+                "/users/me",
+                "GET",
+                null,
+                (response) => {
+                    document.getElementById("profile-name").innerText =
+                        response.full_name ?? response.username;
+
+                    // Store user role
+                    currentUserRole = response.role;
+
+                    if (response.role == "administrator") {
+                        profile_name.style.color = "red";
+                    } else if (response.role == "moderator") {
+                        profile_name.style.color = "yellow";
+                    }
+
+                    // Show create room button for moderators and administrators
+                    const createRoomBtn = document.getElementById('create-room-btn');
+                    if (createRoomBtn && (response.role === 'moderator' || response.role === 'administrator')) {
+                        createRoomBtn.style.display = 'inline-block';
+                    }
+
+                    if (typeof response.avatar == "number") {
+                        document.getElementById("profile-avatar").src = load_preset(response.avatar);
+                    } else if (typeof response.avatar == "string") {
+                        document.getElementById("profile-avatar").src = "data:image/png;base64," + response.avatar;
+                    } else {
+                        document.getElementById("profile-avatar").src = load_preset(1);
+                    }
+                },
+                (error) => redirect("/login.html"),
+            );
+        }
+
+        function load_achievements() {
+            const achievements = document.getElementById("achievements");
+            const achievements_error_msg = document.getElementById("achievements-error");
+
+            achievements_error_msg.innerText = "";
+
+            request_json(
+                "/achievements",
+                "GET",
+                null,
+                (response) => {
+                    achievements.innerHTML = '';
+
+                    if (!response || response.length === 0) {
+                        const row = achievements.insertRow();
+                        const cell = row.insertCell();
+                        cell.colSpan = 2;
+                        cell.innerText = "Нет достижений";
+                        cell.style.textAlign = "center";
+                        cell.style.padding = "20px";
+                        return;
+                    }
+
+                    for (const achievement of response) {
+                        const row = achievements.insertRow();
+                        const src = typeof achievement.icon == "number"
+                            ? load_preset(achievement.icon)
+                            : "data:image/png;base64," + achievement.icon;
+                        row.insertCell().innerHTML = `<img style="width: 64px; height: 64px" src="${src}" alt="${achievement.title}" />`;
+                        row.insertCell().innerHTML = `<label>${achievement.title}</label>`;
+                    }
+                },
+                (error) => {
+                    achievements_error_msg.innerText = error;
+                },
+            );
+        }
+
+        function load_rooms() {
+            const rooms = document.getElementById("rooms");
+            const rooms_error_msg = document.getElementById("rooms-error");
+
+            rooms.innerHTML = "";
+            rooms_error_msg.innerText = "";
+
+            // Build query parameters
+            const params = new URLSearchParams();
+
+            const query = document.getElementById("search-query").value.trim();
+            if (query) {
+                params.append("query", query);
             }
 
-            load_rooms();
-        </script>
-    </body>
+            const count = document.getElementById("search-count").value;
+            if (count) {
+                params.append("count", count);
+            }
+
+            const offset = document.getElementById("search-offset").value;
+            if (offset) {
+                // Calculate actual offset based on page number
+                const pageSize = count || 25;
+                const pageNumber = parseInt(offset) || 0;
+                params.append("offset", pageNumber * pageSize);
+            }
+
+            const queryString = params.toString();
+            const url = queryString ? `/rooms/query?${queryString}` : "/rooms/query";
+
+            request_json(
+                url,
+                "GET",
+                null,
+                (response) => {
+                    if (!response || response.length === 0) {
+                        const row = rooms.insertRow();
+                        const cell = row.insertCell();
+                        cell.colSpan = 7;
+                        cell.innerText = "Нет доступных комнат";
+                        cell.style.textAlign = "center";
+                        cell.style.padding = "20px";
+                        return;
+                    }
+
+                    for (const room of response) {
+                        const row = rooms.insertRow();
+
+                        // Icon column
+                        const src = typeof room.quiz.icon == "number"
+                            ? load_preset(room.quiz.icon)
+                            : "data:image/png;base64," + room.quiz.icon;
+                        row.insertCell().innerHTML = `<img style="width: 64px; height: 64px" src="${src}" alt="${room.quiz.title}" />`;
+
+                        // Title column
+                        const titleCell = row.insertCell();
+                        titleCell.innerHTML = `<label>${room.title}</label>`;
+                        if (room.privacy === "private") {
+                            titleCell.innerHTML += ' 🔒';
+                        }
+
+                        // Room token column
+                        row.insertCell().innerHTML = `<a href="/room.html?room_token=${room.room_token}">${room.room_token}</a>`;
+
+                        // Quiz title column
+                        row.insertCell().innerHTML = `<label>${room.quiz.title}</label>`;
+
+                        // Owner column
+                        row.insertCell().innerHTML = `<label>${room.owner}</label>`;
+
+                        // Players count column
+                        row.insertCell().innerHTML = `<label>${room.users_count}</label>`;
+
+                        // Status column
+                        const statusCell = row.insertCell();
+                        const statusText = room.state === "active" ? "Активна" : "Ожидание";
+                        statusCell.innerHTML = `<label style="color: ${room.state === 'active' ? 'green' : 'orange'}">${statusText}</label>`;
+                    }
+                },
+                (error) => {
+                    rooms_error_msg.innerText = error;
+                },
+            );
+        }
+    </script>
+</body>
+
 </html>

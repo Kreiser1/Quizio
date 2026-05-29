@@ -1,12 +1,12 @@
 @import url("classless.css");
 
-html > body {
+html>body {
     background: linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%);
     background-size: cover;
     background-attachment: fixed;
     width: 100vw;
     height: 100vh;
-    overflow: hidden;
+    overflow: visible;
     display: grid;
     grid-template: repeat(4, 1fr) / repeat(4, 1fr);
     grid-template-areas:
@@ -26,21 +26,23 @@ section.scroll {
     overflow-y: auto;
 }
 
-html > body > section.nav {
+html>body>section.nav {
     grid-area: nav;
     display: flex;
     justify-content: space-between;
     align-items: center;
+    overflow: hidden;
 }
 
-html > body > section.profile {
+html>body>section.profile {
     grid-area: profile;
     display: flex;
     justify-content: space-evenly;
     align-items: center;
+    overflow: hidden;
 }
 
-html > body > section.main {
+html>body>section.main {
     grid-area: main;
     display: flex;
     flex-direction: column;
@@ -48,7 +50,7 @@ html > body > section.main {
     align-items: start;
 }
 
-html > body > section.side {
+html>body>section.side {
     grid-area: side;
     display: flex;
     flex-direction: column;

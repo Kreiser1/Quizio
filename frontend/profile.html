@@ -1,0 +1,370 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Quizio - Профиль</title>
+</head>
+<link rel="stylesheet" href="style.css" />
+<script src="utils.js"></script>
+
+<body>
+    <section class="nav glass">
+        <h1><a href="/">Quizio</a></h1>
+    </section>
+    <section class="profile glass">
+        <img id="profile-avatar" style="width: 64px; height: 64px" />
+        <label id="profile-name"></label>
+    </section>
+    <section class="main glass scroll">
+        <div style="display: flex; gap: 20px;">
+            <img id="profile-full-avatar" style="width: 128px; height: 128px" />
+            <label>
+                <h4 id="profile-full-name"></h4>
+            </label>
+        </div>
+        <label style="margin-top: 20px;">
+            <button id="profile-role" class="outline" disabled></button>
+        </label>
+        <hr>
+        <div style="display: flex; flex-direction: column; width: 100%;">
+            <input type="password" id="old_password" placeholder="Старый пароль" required />
+            <input type="password" id="new_password" placeholder="Новый пароль" />
+            <input type="email" id="new_email" placeholder="Электронная почта" />
+            <button class="warning" id="update-credentials-btn">Изменить данные для входа</button>
+            <label style="color: red" id="credentials-error"></label>
+            <label style="color: green" id="credentials-success"></label>
+        </div>
+        <hr>
+        <div style="display: flex; flex-direction: column; width: 100%;">
+            <input type="text" id="full-name" placeholder="Полное имя" />
+            <label for="avatar">Аватар</label>
+            <input type="file" name="avatar" id="avatar" placeholder="Аватар" accept="image/*">
+            <button class="success" id="update-profile-btn">Изменить профиль</button>
+            <label style="color: red" id="profile-error"></label>
+            <label style="color: green" id="profile-success"></label>
+        </div>
+        <hr>
+        <label>
+            <h4>Сессии</h4>
+        </label>
+        <div style="display: flex; flex-direction: column; width: 100%;">
+            <table id="sessions-table">
+                <thead>
+                    <tr>
+                        <th>Устройство</th>
+                        <th></th>
+                        <th>Время создания</th>
+                        <th>Время истечения</th>
+                    </tr>
+                </thead>
+                <tbody id="sessions"></tbody>
+            </table>
+            <label style="color: red" id="sessions-error"></label>
+        </div>
+    </section>
+    <section class="side glass scroll">
+        <label>
+            <h4>Достижения</h4>
+        </label>
+        <table>
+            <tbody id="achievements"></tbody>
+        </table>
+        <label style="color: red" id="achievements-error"></label>
+    </section>
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            load_profile();
+            load_achievements();
+            load_sessions();
+
+            const updateCredentialsBtn = document.getElementById('update-credentials-btn');
+            const updateProfileBtn = document.getElementById('update-profile-btn');
+
+            if (updateCredentialsBtn) {
+                updateCredentialsBtn.addEventListener('click', handleCredentialsUpdate);
+            } else {
+                console.error('Update credentials button not found');
+            }
+
+            if (updateProfileBtn) {
+                updateProfileBtn.addEventListener('click', handleProfileUpdate);
+            } else {
+                console.error('Update profile button not found');
+            }
+        });
+
+        function load_profile() {
+            const profile_name = document.getElementById("profile-name");
+
+            request_json(
+                "/users/me",
+                "GET",
+                null,
+                (response) => {
+                    document.getElementById("profile-name").innerText = response.username;
+                    document.getElementById("profile-full-name").innerText = response.full_name ?? response.username;
+
+                    if (response.role == "administrator") {
+                        profile_name.style.color = "red";
+                    } else if (response.role == "moderator") {
+                        profile_name.style.color = "yellow";
+                    }
+
+                    document.getElementById("profile-full-name").style.color = profile_name.style.color;
+                    document.getElementById("profile-role").style.color = profile_name.style.color;
+                    document.getElementById("profile-role").innerText =
+                        response.role == 'administrator' ? "Администратор" :
+                            response.role == 'moderator' ? "Модератор" :
+                                "Пользователь";
+
+                    if (typeof response.avatar == "number") {
+                        document.getElementById("profile-avatar").src = load_preset(response.avatar);
+                    } else if (typeof response.avatar == "string") {
+                        document.getElementById("profile-avatar").src = "data:image/png;base64," + response.avatar;
+                    } else {
+                        document.getElementById("profile-avatar").src = load_preset(1);
+                    }
+
+                    document.getElementById("profile-full-avatar").src = document.getElementById("profile-avatar").src;
+
+                    if (response.email) {
+                        document.getElementById("new_email").value = response.email;
+                    }
+
+                    if (response.full_name) {
+                        document.getElementById("full-name").value = response.full_name;
+                    }
+                },
+                (error) => {
+                    console.error('Failed to load profile:', error);
+                    redirect("/login.html");
+                },
+            );
+        }
+
+        function load_achievements() {
+            const achievements = document.getElementById("achievements");
+            const achievements_error_msg = document.getElementById("achievements-error");
+
+            achievements_error_msg.innerText = "";
+
+            request_json(
+                "/achievements",
+                "GET",
+                null,
+                (response) => {
+                    achievements.innerHTML = '';
+
+                    if (!response || response.length === 0) {
+                        const row = achievements.insertRow();
+                        const cell = row.insertCell();
+                        cell.colSpan = 2;
+                        cell.innerText = "Нет достижений";
+                        cell.style.textAlign = "center";
+                        cell.style.padding = "20px";
+                        return;
+                    }
+
+                    for (const achievement of response) {
+                        const row = achievements.insertRow();
+                        const src = typeof achievement.icon == "number"
+                            ? load_preset(achievement.icon)
+                            : "data:image/png;base64," + achievement.icon;
+                        row.insertCell().innerHTML = `<img style="width: 64px; height: 64px" src="${src}" alt="${achievement.title}" />`;
+                        row.insertCell().innerHTML = `<label>${achievement.title}</label>`;
+                    }
+                },
+                (error) => {
+                    achievements_error_msg.innerText = error;
+                },
+            );
+        }
+
+        function load_sessions() {
+            const sessions = document.getElementById("sessions");
+            const sessions_error_msg = document.getElementById("sessions-error");
+
+            sessions_error_msg.innerText = "";
+
+            request_json(
+                "/auth/sessions",
+                "GET",
+                null,
+                (response) => {
+                    sessions.innerHTML = '';
+
+                    if (!response || response.length === 0) {
+                        const row = sessions.insertRow();
+                        const cell = row.insertCell();
+                        cell.colSpan = 4;
+                        cell.innerText = "Нет активных сессий";
+                        cell.style.textAlign = "center";
+                        cell.style.padding = "20px";
+                        return;
+                    }
+
+                    for (const session of response) {
+                        const [refreshToken, userAgent, creationTime, expirationTime] = session;
+                        const row = sessions.insertRow();
+
+                        // Device column
+                        const deviceCell = row.insertCell();
+                        deviceCell.innerText = userAgent || "Неизвестное устройство";
+                        deviceCell.style.maxWidth = "200px";
+                        deviceCell.style.overflow = "hidden";
+                        deviceCell.style.textOverflow = "ellipsis";
+                        deviceCell.title = userAgent; // Show full user agent on hover
+
+                        // Close button column
+                        const actionCell = row.insertCell();
+                        const closeButton = document.createElement("button");
+                        closeButton.className = "danger";
+                        closeButton.innerText = "Закрыть";
+                        closeButton.addEventListener("click", function () {
+                            close_session(refreshToken);
+                        });
+                        actionCell.appendChild(closeButton);
+
+                        // Creation time column
+                        const creationCell = row.insertCell();
+                        creationCell.innerText = creationTime;
+
+                        // Expiration time column
+                        const expirationCell = row.insertCell();
+                        expirationCell.innerText = new Date(expirationTime * 1000).toISOString().replace('T', ' ').substring(0, 19);;
+                    }
+                },
+                (error) => {
+                    sessions_error_msg.innerText = error;
+                },
+            );
+        }
+
+        function close_session(refreshToken) {
+            const sessions_error_msg = document.getElementById("sessions-error");
+            sessions_error_msg.innerText = "";
+
+            request_json(
+                "/auth/logout",
+                "POST",
+                refreshToken,
+                (response) => {
+                    // Reload sessions after successful logout
+                    load_sessions();
+                },
+                (error) => {
+                    sessions_error_msg.innerText = error;
+                }
+            );
+        }
+
+        function handleCredentialsUpdate() {
+            const credentialsError = document.getElementById("credentials-error");
+            const credentialsSuccess = document.getElementById("credentials-success");
+            const oldPassword = document.getElementById("old_password").value;
+            const newPassword = document.getElementById("new_password").value;
+            const newEmail = document.getElementById("new_email").value;
+
+            credentialsError.innerText = "";
+            credentialsSuccess.innerText = "";
+
+            if (!oldPassword) {
+                credentialsError.innerText = "Введите старый пароль";
+                return;
+            }
+
+            const payload = {
+                old_password: oldPassword
+            };
+
+            if (newPassword) {
+                payload.new_password = newPassword;
+            }
+
+            if (newEmail) {
+                payload.new_email = newEmail;
+            }
+
+            if (!newPassword && !newEmail) {
+                credentialsError.innerText = "Введите новый пароль или email";
+                return;
+            }
+
+            request_json(
+                "/auth/register",
+                "PATCH",
+                payload,
+                (response) => {
+                    credentialsSuccess.innerText = "Данные для входа успешно изменены";
+                    document.getElementById("old_password").value = "";
+                    document.getElementById("new_password").value = "";
+                },
+                (error) => {
+                    credentialsError.innerText = error;
+                }
+            );
+        }
+
+        function handleProfileUpdate() {
+            const profileError = document.getElementById("profile-error");
+            const profileSuccess = document.getElementById("profile-success");
+            const fullName = document.getElementById("full-name").value;
+            const avatarFile = document.getElementById("avatar").files[0];
+
+            profileError.innerText = "";
+            profileSuccess.innerText = "";
+
+            if (!fullName && !avatarFile) {
+                profileError.innerText = "Введите полное имя или выберите аватар";
+                return;
+            }
+
+            if (avatarFile) {
+                const reader = new FileReader();
+                reader.onload = function (e) {
+                    const base64 = e.target.result.split(',')[1];
+                    updateProfile(fullName || undefined, base64);
+                };
+                reader.onerror = function () {
+                    profileError.innerText = "Ошибка чтения файла";
+                };
+                reader.readAsDataURL(avatarFile);
+            } else {
+                updateProfile(fullName || undefined, null);
+            }
+        }
+
+        function updateProfile(fullName, avatarBase64) {
+            const profileError = document.getElementById("profile-error");
+            const profileSuccess = document.getElementById("profile-success");
+
+            const payload = {};
+
+            if (fullName) {
+                payload.full_name = fullName;
+            }
+
+            if (avatarBase64) {
+                payload.avatar = avatarBase64;
+            }
+
+            request_json(
+                "/users/me",
+                "PATCH",
+                payload,
+                (response) => {
+                    profileSuccess.innerText = "Профиль успешно обновлен";
+                    load_profile();
+                    document.getElementById("avatar").value = "";
+                },
+                (error) => {
+                    profileError.innerText = error;
+                }
+            );
+        }
+    </script>
+</body>
+
+</html>
