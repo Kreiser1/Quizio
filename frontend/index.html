@@ -15,22 +15,23 @@
     </section>
     <section class="profile glass">
         <img id="profile-avatar" style="width: 64px; height: 64px" />
-        <a id="profile-name" href="/profile.html" style="margin-left: 10px;"></a>
+        <a id="profile-name" href="/profile.html"></a>
     </section>
     <section class="main glass" style="
                 display: grid;
-                grid-template-rows: 4fr 1fr;
+                grid-template-rows: 1fr auto;
                 justify-content: stretch;
                 align-items: start;
+                min-height: 0;
             ">
-        <div class="scroll">
+        <div class="scroll" style="overflow-x: auto;">
             <label>
                 <h4>Комнаты</h4>
             </label>
-            <table>
+            <table style="width: 100%; min-width: 600px;">
                 <thead>
                     <tr>
-                        <th></th>
+                        <th style="width: 64px;"></th>
                         <th>Название</th>
                         <th>Билет</th>
                         <th>Викторина</th>
@@ -43,11 +44,12 @@
             </table>
             <label style="color: red" id="rooms-error"></label>
         </div>
-        <div style="display: flex; flex-direction: row; gap: 5px; align-items: center;">
-            <input onchange="load_rooms()" type="search" id="search-query" placeholder="Поиск..." />
-            <input onchange="load_rooms()" type="number" min="0" value="" id="search-count" placeholder="Количество" />
-            <input onchange="load_rooms()" type="number" min="0" value="" id="search-offset" placeholder="Страница" />
-            <button id="create-room-btn" class="success" style="display: none;">Создать комнату</button>
+        <div style="display: flex; flex-direction: row; gap: 5px; align-items: center; padding: 10px 0;">
+            <input type="search" id="search-query" placeholder="Поиск..." />
+            <input type="number" min="0" value="" id="search-count" placeholder="Количество" />
+            <input type="number" min="0" value="" id="search-offset" placeholder="Страница" />
+            <button id="create-room-btn" class="success" style="display: none;">Создать
+                комнату</button>
         </div>
     </section>
     <section class="side glass scroll">
@@ -61,19 +63,52 @@
     </section>
     <script>
         let currentUserRole = 'user';
+        let roomsLoaded = false;
+        let achievementsLoaded = false;
+        let roomsLoading = false;
+        let searchTimeout = null;
 
         document.addEventListener('DOMContentLoaded', function () {
             load_profile();
-            load_achievements();
-            load_rooms();
 
-            // Add Enter key support for search inputs
+            if (!achievementsLoaded) {
+                load_achievements();
+                achievementsLoaded = true;
+            }
+
+            if (!roomsLoaded) {
+                load_rooms();
+                roomsLoaded = true;
+            }
+
+            // Replace onchange with input event with debounce
             const searchInputs = ['search-query', 'search-count', 'search-offset'];
             searchInputs.forEach(id => {
                 const input = document.getElementById(id);
                 if (input) {
+                    // Remove inline onchange handlers
+                    input.removeAttribute('onchange');
+
+                    // Add input event with debounce for search-query
+                    if (id === 'search-query') {
+                        input.addEventListener('input', function () {
+                            clearTimeout(searchTimeout);
+                            searchTimeout = setTimeout(() => {
+                                load_rooms();
+                            }, 500); // 500ms debounce
+                        });
+                    } else {
+                        // Immediate change for number inputs
+                        input.addEventListener('change', function () {
+                            load_rooms();
+                        });
+                    }
+
+                    // Add Enter key support
                     input.addEventListener('keypress', function (e) {
                         if (e.key === 'Enter') {
+                            e.preventDefault();
+                            clearTimeout(searchTimeout);
                             load_rooms();
                         }
                     });
@@ -166,9 +201,15 @@
         }
 
         function load_rooms() {
+            // Prevent multiple simultaneous requests
+            if (roomsLoading) {
+                return;
+            }
+
             const rooms = document.getElementById("rooms");
             const rooms_error_msg = document.getElementById("rooms-error");
 
+            roomsLoading = true;
             rooms.innerHTML = "";
             rooms_error_msg.innerText = "";
 
@@ -208,6 +249,7 @@
                         cell.innerText = "Нет доступных комнат";
                         cell.style.textAlign = "center";
                         cell.style.padding = "20px";
+                        roomsLoading = false;
                         return;
                     }
 
@@ -228,13 +270,16 @@
                         }
 
                         // Room token column
-                        row.insertCell().innerHTML = `<a href="/room.html?room_token=${room.room_token}">${room.room_token}</a>`;
+                        const tokenCell = row.insertCell();
+                        tokenCell.innerHTML = `<a href="/room.html?room_token=${room.room_token}" style="white-space: nowrap;">${room.room_token}</a>`;
+                        tokenCell.style.wordBreak = 'break-all';
 
                         // Quiz title column
                         row.insertCell().innerHTML = `<label>${room.quiz.title}</label>`;
 
-                        // Owner column
-                        row.insertCell().innerHTML = `<label>${room.owner}</label>`;
+                        // Owner column - use full_name if available
+                        const ownerCell = row.insertCell();
+                        ownerCell.innerHTML = `<label>${room.owner_full_name || room.owner}</label>`;
 
                         // Players count column
                         row.insertCell().innerHTML = `<label>${room.users_count}</label>`;
@@ -244,9 +289,12 @@
                         const statusText = room.state === "active" ? "Активна" : "Ожидание";
                         statusCell.innerHTML = `<label style="color: ${room.state === 'active' ? 'green' : 'orange'}">${statusText}</label>`;
                     }
+
+                    roomsLoading = false;
                 },
                 (error) => {
                     rooms_error_msg.innerText = error;
+                    roomsLoading = false;
                 },
             );
         }
