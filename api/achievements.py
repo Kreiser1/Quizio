@@ -16,15 +16,12 @@ router = APIRouter(prefix='/achievements', tags=['Достижения'])
 def create_achievement(
     session: depends.Session,
     moderator: depends.Moderator,
-    payload: schema.AchievementCreate = Body(...)
+    payload: schema.AchievementCreate
 ) -> schema.Achievement:
     """Создать новое достижение."""
     
-    if isinstance(payload.icon, str):
-        if len(payload.icon) > config.IMAGE_SIZE_LIMIT:
-            raise UnprocessableHTTPException("Иконка слишком большая.")
-    elif payload.icon > 1048576:
-        raise UnprocessableHTTPException("Неверная иконка.")
+    if isinstance(payload.icon, str) and len(payload.icon) > config.IMAGE_SIZE_LIMIT:
+        raise UnprocessableHTTPException("Иконка слишком большая.")
 
     try:
         compile(payload.condition, "<string>", "eval")
@@ -38,54 +35,44 @@ def create_achievement(
         
     return achievement
 
-@router.delete('/{id}', status_code=status.HTTP_200_OK)
+@router.delete('/{id}')
 def delete_achievement(
     session: depends.Session,
     moderator: depends.Moderator,
-    id: schema.Index = Path(...)
+    id: schema.Uint = Path(...)
 ):
     """Удалить достижение."""
 
     if not achisvc.delete_achievement(session, id):
         raise NotFoundHTTPException("Достижение не найдено.")
 
-@router.get('/yaml', status_code=status.HTTP_200_OK)
-def download_achievements_yaml(
-    session: depends.Session,
-    moderator: depends.Moderator
-):
-    """Скачать .yaml достижений."""
-
-    achievements = achisvc.get_achievements(session)
-    
-    if not achievements:
-        raise NotFoundHTTPException("Список достижений пуст.")
-
-    file_like = io.BytesIO(schema.Achievement.to_yaml(achievements).encode('utf-8'))
-    filename = 'achievements.yaml'
-
-    return StreamingResponse(
-        file_like, 
-        media_type='application/x-yaml',
-        headers={
-            'Content-Disposition': f'attachment; filename="{filename}"'
-        }
-    )
-
-@router.get('', response_model=list[schema.AchievementCreate], status_code=status.HTTP_200_OK)
+@router.get('', response_model=list[schema.Achievement])
 def get_my_achievements(
     session: depends.Session,
-    username: depends.Username
+    username: depends.Username,
+    role: depends.Role
 ) -> list[schema.AchievementCreate]:
     """Получить список достижений текущего пользователя."""
     
-    user_achievements = achisvc.get_user_achievements(session, username)
+    achievements = achisvc.get_user_achievements(session, username)
+
+    if role != 'administrator' and role != 'moderator':
+        for achievement in achievements:
+            achievement.condition = '<secret>'
         
-    return [
-        schema.AchievementCreate(
-            title=achievement.title,
-            icon=achievement.icon,
-            condition='<secret>'
-        )
-        for achievement in user_achievements
-    ]
+    return achievements
+
+@router.get('/all', response_model=list[schema.Achievement])
+def get_achievements(
+    session: depends.Session,
+    role: depends.Role
+) -> list[schema.Achievement]:
+    """Получить список всех достижений."""
+
+    achievements = achisvc.get_achievements(session)
+
+    if role != 'administrator' and role != 'moderator':
+        for achievement in achievements:
+            achievement.condition = '<secret>'
+        
+    return achievements

@@ -3,46 +3,53 @@ import database as db
 import schema
 
 def create_achievement(session: db.Session, payload: schema.AchievementCreate) -> schema.Achievement | None:
+    try:
+        compile(payload.condition, "<string>", "eval")
+    except SyntaxError:
+        return None
+    
     new_achievement = db.Achievement(
         title=payload.title,
         icon=payload.icon,
         condition=payload.condition
     )
 
-    try:
-        session.add(new_achievement)
-        session.flush()
+    session.add(new_achievement)
 
-        return schema.Achievement(
-            id=new_achievement.id,
-            title=new_achievement.title,
-            icon=new_achievement.icon,
-            condition=new_achievement.condition
-        )
+    try:
+        session.flush()
     except db.IntegrityError:
         return None
+    
+    return schema.Achievement(
+        id=new_achievement.id,
+        title=new_achievement.title,
+        icon=new_achievement.icon,
+        condition=new_achievement.condition
+    )
 
-def delete_achievement(session: db.Session, id: schema.Index) -> bool:
+def delete_achievement(session: db.Session, id: schema.Uint) -> bool:
     return session.execute(db.delete(db.Achievement).where(db.Achievement.id == id)).rowcount > 0
 
-def award_achievement(session: db.Session, username: schema.Username, id: schema.Index) -> bool:
+def award_achievement(session: db.Session, username: schema.Username, id: schema.Uint) -> bool:
     user_exists = session.query(db.User.username).filter(db.User.username == username).scalar() is not None
     achi_exists = session.query(db.Achievement.id).filter(db.Achievement.id == id).scalar() is not None
     
     if not user_exists or not achi_exists:
         return False
+    
+    session.execute(db.insert(db.user_achievement).values(
+        username=username,
+        achievement_id=id
+    ))
 
     try:
-        session.execute(db.insert(db.user_achievement).values(
-            username=username,
-            achievement_id=id
-        ))
         session.flush()
         return True
     except db.IntegrityError:
         return False
 
-def revoke_achievement(session: db.Session, username: schema.Username, id: schema.Index) -> bool:
+def revoke_achievement(session: db.Session, username: schema.Username, id: schema.Uint) -> bool:
     return session.execute(db.delete(db.user_achievement).where(db.user_achievement.c.username == username, db.user_achievement.c.achievement_id == id)).rowcount > 0
 
 def get_user_achievements(session: db.Session, username: schema.Username) -> list[schema.Achievement]:

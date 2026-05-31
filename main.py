@@ -12,12 +12,12 @@ with db.connect() as session:
             username=config.ADMIN_USERNAME,
             password=config.ADMIN_PASSWORD
         )):
-            security.update_role(session, schema.UserRoleUpdate(username=config.ADMIN_USERNAME, role='administrator'))
+            security.set_role(session, schema.UserRoleUpdate(username=config.ADMIN_USERNAME, role='administrator'))
 
 import config
 from api import api_router
 
-app = FastAPI(debug=config.DEBUG, title='Quizio', description='Quizio API')
+app = FastAPI(title='Quizio', description='Quizio API')
 
 def custom_openapi():
     if app.openapi_schema:
@@ -25,24 +25,42 @@ def custom_openapi():
     
     openapi_schema = FastAPI.openapi(app)
     
-    openapi_schema["components"]["securitySchemes"] = {
-        "AccessCookie": {
-            "type": "apiKey",
-            "in": "cookie",
-            "name": security.ACCESS_COOKIE,
-            "description": "Токен доступа в куках. Устанавливается автоматически в /login."
+    openapi_schema['components']['securitySchemes'] = {
+        'AccessCookie': {
+            'type': 'apiKey',
+            'in': 'cookie',
+            'name': security.ACCESS_COOKIE,
+            'description': 'Токен доступа в куках. Устанавливается автоматически в /login.'
         },
-        "RefreshCookie": {
-            "type": "apiKey",
-            "in": "cookie",
-            "name": security.REFRESH_COOKIE,
-            "description": "Токен обновления в куках. Устанавливается автоматически в /login."
+        'RefreshCookie': {
+            'type': 'apiKey',
+            'in': 'cookie',
+            'name': security.REFRESH_COOKIE,
+            'description': 'Токен обновления в куках. Устанавливается автоматически в /login.'
         }
     }
     
-    openapi_schema["security"] = [
-        {"AccessCookie": [], "RefreshCookie": []}
+    openapi_schema['security'] = [
+        {'AccessCookie': [], 'RefreshCookie': []}
     ]
+
+    openapi_schema['paths']['/api/rooms/{room_token}/stream'] = {
+        'get': {
+            'description': 'WebSocket для просмотра комнаты в реальном времени.',
+            'tags': ['Комнаты'],
+            'parameters': [
+                {
+                    'name': 'room_token',
+                    'in': 'path',
+                    'required': True,
+                    'schema': {
+                        'type': 'string'
+                    }
+                }
+            ]
+        }
+    }
+    
     
     app.openapi_schema = openapi_schema
     return app.openapi_schema
@@ -53,17 +71,17 @@ app.add_middleware(
     CORSMiddleware,
     allow_origin_regex=r'^https?://(localhost|127\.0\.0\.1)(:\d+)?$',
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=['*'],
+    allow_headers=['*'],
 )
 
 app.include_router(api_router)
 
 FRONTEND = 'frontend'
 
-@app.get("/{route:path}")
+@app.get('/{route:path}')
 def frontend(route: str):
-    if route.lower().startswith("api/"):
+    if route.lower().startswith('api/'):
         return Response(status_code=status.HTTP_404_NOT_FOUND)
         
     if not route and os.path.exists(FRONTEND + '/index.html'):
@@ -79,4 +97,4 @@ def frontend(route: str):
 
 if __name__ == '__main__':
     import uvicorn
-    uvicorn.run("main:app", host="0.0.0.0", port=80, reload=True)
+    uvicorn.run('main:app', host='0.0.0.0', port=80, reload=True)

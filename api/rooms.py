@@ -1,45 +1,38 @@
 import asyncio
 from typing import Annotated
-from fastapi import APIRouter, status, Path, Depends, Body, Query, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, status, Path, Cookie, Header, Body, Query, WebSocket, WebSocketDisconnect, Depends
 from pydantic import ValidationError
 
 import schema
 import depends
 import roomsvc
+import usersvc
 import config
 import security
+import database as db
+from time import perf_counter
 from exceptions import *
 
 
 router = APIRouter(prefix='/rooms', tags=['Комнаты'])
 
-def _check_room_owner(room_token: schema.RoomToken, username: schema.Username, role: schema.Role) -> None:
-    if room_token not in roomsvc.rooms:
-        raise NotFoundHTTPException("Игровая комната не найдена.")
-    if roomsvc.rooms[room_token].owner != username and role != 'administrator':
-        raise ForbiddenHTTPException("У вас нет прав для управления этой комнатой.")
-
-def _mask_room_stream(stream: schema.RoomStream, username: schema.Username) -> schema.RoomStream:
-    masked_stream = stream.model_copy(deep=True)
-    
-    for user in masked_stream.users:
+def _hide_room_stream_answers(room_stream: schema.RoomStream, username: schema.Username):
+    for user in room_stream.users:
         if user.username != username:
             user.answers = set()
             
-    for team in masked_stream.teams:
+    for team in room_stream.teams:
         for user in team.users:
             if user.username != username:
                 user.answers = set()
-                
-    return masked_stream
 
 @router.post('', status_code=status.HTTP_201_CREATED)
 def create_room(
     session: depends.Session,
     moderator: depends.Moderator,
     username: depends.Username,
-    payload: schema.RoomCreate = Body(...)
-) -> schema.RoomToken:
+    payload: schema.RoomCreate
+) -> schema.HexString:
     """Создать комнату."""
 
     room_token = roomsvc.create_room(session, username, payload)
@@ -49,163 +42,189 @@ def create_room(
     
     return room_token
 
-@router.put('/{room_token}', status_code=status.HTTP_200_OK)
-def update_room(
-    session: depends.Session,
-    moderator: depends.Moderator,
-    username: depends.Username,
-    role: depends.Role,
-    room_token: schema.RoomToken = Path(...),
-    payload: schema.RoomCreate = Body(...)
-):
-    """Обновить комнату."""
-
-    _check_room_owner(room_token, username, role)
-    
-    if not roomsvc.update_room(session, room_token, payload):
-        raise ConflictHTTPException("Не удалось обновить комнату.")
-
-@router.get('/query', response_model=list[schema.RoomPreview], status_code=status.HTTP_200_OK)
+@router.get('/query', response_model=list[schema.RoomPreview])
 def search_rooms(
     role: depends.Role,
-    query: schema.Title | None = Query(default=None),
-    count: schema.Count = Query(default=25),
-    offset: schema.Index = Query(default=0)
+    query: schema.Name | None = Query(default=None),
+    count: schema.Uint = Query(default=25),
+    offset: schema.Uint = Query(default=0)
 ) -> list[schema.RoomPreview]:
-    """Поиск комнат."""
+    """Поиск комнат по названию."""
 
-    return roomsvc.search_rooms(query=query, count=count, offset=offset, force=(role == 'administrator' or role=='moderator'))
+    return roomsvc.search_rooms(query=query, count=count, offset=offset, include_private=(role in ('moderator', 'administrator')))
 
-@router.get('/{room_token}', status_code=status.HTTP_200_OK)
-def join_room(
-    username: depends.Username,
-    room_token: schema.RoomToken = Path(...)
-):
-    """Присоединиться к комнате."""
+@router.get('/{room_token}', response_model=schema.RoomStream)
+def get_room(
+    moderator: depends.Moderator,
+    room_token: schema.HexString = Path(...)
+) -> schema.RoomStream:
+    """Получить данные комнаты."""
 
-    if not roomsvc.join_room(room_token, username):
-        raise ForbiddenHTTPException("Вы забанены или комната не существует.")
+    room = roomsvc.get_room(room_token)
 
-@router.post('/{room_token}/answer', status_code=status.HTTP_200_OK)
+    if not room:
+        raise NotFoundHTTPException("Не удалось найти комнату.")
+    
+    return room.stream
+
+@router.post('/{room_token}/answer')
 def submit_answer(
     username: depends.Username,
-    room_token: schema.RoomToken = Path(...),
+    room_token: schema.HexString = Path(...),
     payload: schema.Answer = Body(...)
 ) -> bool:
     """Отправить ответ."""
 
-    return roomsvc.submit_answer(room_token, username, payload)
+    room = roomsvc.get_room(room_token)
 
-@router.post('/{room_token}/control', status_code=status.HTTP_200_OK)
+    if not room:
+        raise NotFoundHTTPException("Не удалось найти комнату.")
+    
+    return room.submit(username, payload)
+
+@router.post('/{room_token}/control')
 def control_room(
     moderator: depends.Moderator,
     username: depends.Username,
-    role: depends.Role,
-    room_token: schema.RoomToken = Path(...),
+    room_token: schema.HexString = Path(...),
     payload: schema.RoomControl = Body(...)
 ):
     """Отправить команду управления комнатой."""
 
-    _check_room_owner(room_token, username, role)
+    room = roomsvc.get_room(room_token)
 
-    result = roomsvc.control_room(room_token, payload)
-    
-    if not result:
-        raise UnprocessableHTTPException("Неверная команда или индекс вопроса.")
+    if not room:
+        raise NotFoundHTTPException("Не удалось найти комнату.")
 
-@router.post('/{room_token}/ban', status_code=status.HTTP_200_OK)
+    if payload.command == 'shutdown':
+        if not roomsvc.delete_room(room_token):
+            raise UnknownHTTPException("Не удалось завершить комнату.")
+    elif payload.command == 'show':
+        if payload.question is None:
+            raise BadRequestHTTPException("Вопрос для показа не указан.")
+        room.show(payload.question)
+    elif payload.command == 'start':
+        if payload.question is None:
+            raise BadRequestHTTPException("Вопрос для запуска не указан.")
+
+        room.start(payload.question)
+    elif payload.command == 'hide':
+        room.hide()
+    elif payload.command == 'stop':
+        room.stop()
+
+@router.post('/{room_token}/ban')
 def ban_user(
-    moderator: depends.Moderator, username: depends.Username, role: depends.Role,
-    room_token: schema.RoomToken = Path(...), ban_username: schema.Username = Body(embed=True)
+    moderator: depends.Moderator,
+    room_token: schema.HexString = Path(...),
+    username: schema.Username = Body(embed=True)
 ):
-    """Забанить пользователя."""
+    """Забанить пользователя по имени."""
 
-    _check_room_owner(room_token, username, role)
+    room = roomsvc.get_room(room_token)
 
-    if not roomsvc.ban_user(room_token, ban_username):
+    if not room:
+        raise NotFoundHTTPException("Не удалось найти комнату.")
+
+    if not room.ban(username):
         raise NotFoundHTTPException("Пользователь не найден.")
 
-@router.post('/{room_token}/unban', status_code=status.HTTP_200_OK)
+@router.post('/{room_token}/unban')
 def unban_user(
-    moderator: depends.Moderator, username: depends.Username, role: depends.Role,
-    room_token: schema.RoomToken = Path(...), unban_username: schema.Username = Body(embed=True)
+    moderator: depends.Moderator,
+    room_token: schema.HexString = Path(...),
+    username: schema.Username = Body(embed=True)
 ):
-    """Разбанить пользователя."""
+    """Разбанить пользователя по имени."""
 
-    _check_room_owner(room_token, username, role)
+    room = roomsvc.get_room(room_token)
 
-    if not roomsvc.unban_user(room_token, unban_username):
+    if not room:
+        raise NotFoundHTTPException("Не удалось найти комнату.")
+
+    if not room.unban(username):
         raise NotFoundHTTPException("Пользователь не найден.")
 
 @router.post('/{room_token}/teams', status_code=status.HTTP_201_CREATED)
 def add_team(
-    moderator: depends.Moderator, username: depends.Username, role: depends.Role,
-    room_token: schema.RoomToken = Path(...), payload: schema.RoomTeam = Body(...)
+    moderator: depends.Moderator,
+    room_token: schema.HexString = Path(...),
+    payload: schema.RoomTeam = Body(...)
 ):
     """Добавить команду."""
 
-    _check_room_owner(room_token, username, role)
+    room = roomsvc.get_room(room_token)
 
-    if not roomsvc.add_team(room_token, payload):
+    if not room:
+        raise NotFoundHTTPException("Не удалось найти комнату.")
+
+    if not room.add_team(payload):
         raise ConflictHTTPException("Команда уже существует.")
 
-@router.delete('/{room_token}/teams/{title}', status_code=status.HTTP_200_OK)
+@router.delete('/{room_token}/teams')
 def delete_team(
-    moderator: depends.Moderator, username: depends.Username, role: depends.Role,
-    room_token: schema.RoomToken = Path(...), title: schema.Title = Path(...)
+    moderator: depends.Moderator,
+    room_token: schema.HexString = Path(...),
+    title: schema.Name = Body(embed=True)
 ):
     """Удалить команду."""
-    
-    _check_room_owner(room_token, username, role)
 
-    if not roomsvc.delete_team(room_token, title):
+    room = roomsvc.get_room(room_token)
+
+    if not room:
+        raise NotFoundHTTPException("Не удалось найти комнату.")
+
+    if not room.delete_team(title):
         raise NotFoundHTTPException("Команда не найдена.")
 
-@router.post('/{room_token}/team', status_code=status.HTTP_200_OK)
+@router.post('/{room_token}/team')
 def set_user_team(
     moderator: depends.Moderator, current_username: depends.Username, role: depends.Role,
-    room_token: schema.RoomToken = Path(...),
-    username: schema.Username = Body(...),
-    team: schema.Title | None = Body(default=None)
+    room_token: schema.HexString = Path(...),
+    username: schema.Username = Body(embed=True),
+    title: schema.Name | None = Body(embed=True, default=None)
 ):
     """Установить команду пользователя."""
     
-    _check_room_owner(room_token, current_username, role)
+    room = roomsvc.get_room(room_token)
 
-    if not roomsvc.set_user_team(room_token, username, team):
-        raise NotFoundHTTPException("Не удалось обновить команду пользователя.")
+    if not room:
+        raise NotFoundHTTPException("Не удалось найти комнату.")
+
+    if not room.set_user_team(username, title):
+        raise NotFoundHTTPException("Не удалось обновить команду пользователя. Проверьте имя.")
 
 
 from pydantic import TypeAdapter
 
 
 def _authorize_room_steam(
-    session: Session,
+    session: db.Session,
     access_token: str | None,
-    refresh_token: str | None
+    refresh_token: str | None,
 ) -> schema.Username | None:
     if not refresh_token:
         return None
 
     try:
-        refresh_token = TypeAdapter(schema.RefreshToken).validate_python(refresh_token)
+        refresh_token = TypeAdapter(schema.HexString).validate_python(refresh_token)
     except schema.ValidationError:
         return None
     
     try:
-        access_token = TypeAdapter(schema.AccessToken).validate_python(access_token)
+        access_token = TypeAdapter(schema.Jwt).validate_python(access_token)
     except schema.ValidationError:
         access_token = None
     
     username: schema.Username | None = None
 
     if access_token:
-        username = security.login(refresh_token, access_token)
+        username = security.login(access_token)
 
     if not username:
         access_token = security.refresh(session, refresh_token)
         if access_token:
-            username = security.login(refresh_token, access_token)
+            username = security.login(access_token)
 
     return username
 
@@ -213,44 +232,67 @@ def _authorize_room_steam(
 async def room_stream(
     websocket: WebSocket,
     session: depends.Session,
-    room_token: schema.RoomToken = Path(...)
+    room_token: schema.HexString = Path(...)
 ):
     """WebSocket для просмотра комнаты в реальном времени."""
 
-    username = _authorize_room_steam(session, websocket.cookies.get(security.ACCESS_COOKIE), websocket.cookies.get(security.REFRESH_COOKIE))
+    access_token_cookie = websocket.cookies.get(security.ACCESS_COOKIE)
+    refresh_token_cookie = websocket.cookies.get(security.REFRESH_COOKIE)
+
+    access_token_header = websocket.headers.get("access-token")
+    refresh_token_header = websocket.headers.get("refresh-token")
+
+    access_token = access_token_cookie or access_token_header
+    refresh_token = refresh_token_cookie or refresh_token_header
+
+    username = _authorize_room_steam(session, access_token, refresh_token)
 
     if not username:
         await websocket.close(code=1008, reason=UnauthorizedHTTPException().detail)
         return
     
-    if not roomsvc.join_room(room_token, username):
+    room = roomsvc.get_room(room_token)
+
+    if not room:
+        await websocket.close(code=1008, reason="Не удалось найти комнату.")
+        return
+    
+    role = security.get_role(session, username) or 'user'
+    profile = usersvc.get_profile(session, username)
+    nickname = profile.nickname
+
+    if not room.join(username, nickname, role in ('moderator', 'administrator')):
         await websocket.close(code=1008, reason=ForbiddenHTTPException().detail)
         return
 
     await websocket.accept()
 
-    role = security.get_role(session, username) or 'user'
-
-    if room_token in roomsvc.rooms:
-        user = next((user for user in roomsvc.rooms[room_token].users if user.username == username), None)
-        if user and user.connection_state != 'banned':
-            user.connection_state = 'connected'
+    user = next((user for user in room.users if user.username == username), None)
+    
+    if user and user.connection != 'banned':
+        user.connection = 'connected'
 
     try:
         while True:
-            room_stream = roomsvc.refresh_room(room_token, delta_time=1.0 / config.FREQUENCY)
-
-            if not room_stream:
-                await websocket.send_json({})
+            if room_token not in roomsvc.ROOMS:
                 await websocket.close()
                 break
+
+            if user.connection == 'banned':
+                await websocket.close()
+                break
+
+            room.refresh(perf_counter())
+
+            room_stream = room.stream
                 
-            room_stream = room_stream if role in ('moderator', 'administrator') else _mask_room_stream(room_stream, username)
+            if role not in ('moderator', 'administrator'):
+                _hide_room_stream_answers(room_stream, username)
+
             await websocket.send_json(room_stream.model_dump(mode='json'))
                 
             await asyncio.sleep(1.0 / config.FREQUENCY)
     except WebSocketDisconnect:
-        if username and room_token in roomsvc.rooms:
-            user = next((user for user in roomsvc.rooms[room_token].users if user.username == username), None)
-            if user and user.connection_state != 'banned':
-                user.connection_state = 'disconnected'
+        if room_token in roomsvc.ROOMS:
+            if user and user.connection != 'banned':
+                user.connection = 'disconnected'
