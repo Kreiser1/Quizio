@@ -53,7 +53,7 @@ def search_rooms(
 
     return roomsvc.search_rooms(query=query, count=count, offset=offset, include_private=(role in ('moderator', 'administrator')))
 
-@router.get('/{room_token}', response_model=schema.Room)
+@router.get('/{room_token}', response_model=schema.RoomStream)
 def get_room(
     moderator: depends.Moderator,
     room_token: schema.HexString = Path(...)
@@ -102,13 +102,14 @@ def control_room(
     elif payload.command == 'show':
         if payload.question is None:
             raise BadRequestHTTPException("Вопрос для показа не указан.")
-
         room.show(payload.question)
     elif payload.command == 'start':
         if payload.question is None:
             raise BadRequestHTTPException("Вопрос для запуска не указан.")
 
         room.start(payload.question)
+    elif payload.command == 'hide':
+        room.hide()
     elif payload.command == 'stop':
         room.stop()
 

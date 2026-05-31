@@ -253,12 +253,12 @@ class Room(BaseModel):
 
     @property
     def preview(self) -> RoomPreview:
-        return RoomPreview(title=self.title, owner=self.owner, users=len(self.users), privacy=self.privacy,
-                           room_token='000000', state=('active' if self.question else 'waiting'))
+        return RoomPreview(title=self.title, owner=self.owner, quiz=self.quiz.preview, users=len(self.users), privacy=self.privacy,
+                           room_token='000000', state=('active' if self.question is not None else 'waiting'))
 
     @property
     def stream(self) -> RoomStream:
-        question = self.quiz.questions[self.question] if (self.question and self.question < len(self.quiz.questions)) else Question(
+        question = self.quiz.questions[self.question] if (self.question is not None and self.question < len(self.quiz.questions)) else Question(
             score=0,
             text='<default>',
             title='<default>',
@@ -275,7 +275,7 @@ class Room(BaseModel):
             users=self.users,
             teams=self.teams,
             privacy=self.privacy,
-            question=self.question if self.question and self.question < len(self.quiz.questions) else None,
+            question=self.question if self.question is not None and self.question < len(self.quiz.questions) else None,
             score=question.score,
             text=question.text,
             question_title=question.title,
@@ -283,7 +283,7 @@ class Room(BaseModel):
             code=question.code,
             question_type=question.type,
             hint=question.hint,
-            time=self.time if self.question and self.question < len(self.quiz.questions) else None
+            time=self.time if self.question is not None and self.question < len(self.quiz.questions) else None
         )
     
     def start(self, question: Uint):
@@ -292,6 +292,10 @@ class Room(BaseModel):
 
     def show(self, question: Uint):
         self.question = question if question < len(self.quiz.questions) else None
+        self.time = None
+
+    def hide(self):
+        self.question = None
         self.time = None
 
     def stop(self):
@@ -437,7 +441,7 @@ class Room(BaseModel):
     
 
 class RoomControl(BaseModel):
-    command: Literal['show', 'start', 'stop', 'shutdown']
+    command: Literal['show', 'start', 'hide', 'stop', 'shutdown']
     question: Uint | None = None
     
 
