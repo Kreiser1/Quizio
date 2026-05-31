@@ -2,25 +2,28 @@ import schema, security, database as db
 
 def get_profile(session: db.Session, username: schema.Username) -> schema.UserProfile | None:
     profile = session.execute(db.select(
-        db.User.full_name,
+        db.User.nickname,
         db.User.email,
         db.User.avatar,
-        db.User.creation_time,
+        db.User.creation_date,
         db.User.role
-    ).where(db.User.username == username)).mappings().first()
+    ).where(db.User.username == username)).first()
 
     if not profile:
         return None
     
-    email = security.decode(profile['email'])['email'] if profile['email'] else None
-    
+    email = profile[1]
+
+    if email and (email := security.decode(email)):
+        email = email['email']
+
     return schema.UserProfile(
         username=username,
-        full_name=profile['full_name'],
+        nickname=profile[0],
         email=email,
-        avatar=profile['avatar'],
-        creation_time=profile['creation_time'],
-        role=profile['role']
+        avatar=profile[2],
+        creation_date=profile[3],
+        role=profile[4]
     )
 
 def update_profile(session: db.Session, username: schema.Username, user_update_payload: schema.UserUpdate) -> bool:
@@ -30,9 +33,6 @@ def update_profile(session: db.Session, username: schema.Username, user_update_p
     }
 
     return session.execute(db.update(db.User).where(db.User.username == username).values(**params)).rowcount > 0
-
-def update_role(session: db.Session, user_role_update_payload: schema.UserRoleUpdate) -> bool:
-    return session.execute(db.update(db.User).where(db.User.username == user_role_update_payload.username).values(role=user_role_update_payload.role)).rowcount > 0
 
 def delete_profile(session: db.Session, username: schema.Username) -> bool:
     return session.execute(db.delete(db.User).where(db.User.username == username)).rowcount > 0

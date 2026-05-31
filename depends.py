@@ -35,7 +35,7 @@ def _authorize(
     session: Session,
     request: Request,
     response: Response,
-    access_token_cookie: Annotated[str| None, Cookie(alias=security.ACCESS_COOKIE)] = None,
+    access_token_cookie: Annotated[str | None, Cookie(alias=security.ACCESS_COOKIE)] = None,
     refresh_token_cookie: Annotated[str | None, Cookie(alias=security.REFRESH_COOKIE)] = None,
     access_token: Annotated[str | None, Header()] = None,
     refresh_token: Annotated[str | None, Header()] = None,
@@ -47,12 +47,12 @@ def _authorize(
         return None
 
     try:
-        refresh_token = TypeAdapter(schema.RefreshToken).validate_python(refresh_token)
+        refresh_token = TypeAdapter(schema.HexString).validate_python(refresh_token)
     except schema.ValidationError:
         return None
     
     try:
-        access_token = TypeAdapter(schema.AccessToken).validate_python(access_token)
+        access_token = TypeAdapter(schema.Jwt).validate_python(access_token)
     except schema.ValidationError:
         access_token = None
     
@@ -64,13 +64,13 @@ def _authorize(
 
         if not ((access_token := security.refresh(session, refresh_token)) and (new_access_token := True)):
             return None
-    elif not (username := security.login(refresh_token, access_token)):
+    elif not (username := security.login(access_token)):
         _check_cooldown(request)
 
         if not ((access_token := security.refresh(session, refresh_token)) and (new_access_token := True)):
             return None
 
-    if not username and not (username := security.login(refresh_token, access_token)):
+    if not username and not (username := security.login(access_token)):
         return None
 
     if new_access_token:
@@ -78,8 +78,8 @@ def _authorize(
             key=security.ACCESS_COOKIE,
             value=access_token,
             httponly=True,
-            samesite='lax' if config.DEBUG else 'none',
-            secure=not config.DEBUG
+            samesite='none',
+            secure=True
         )
     
     return username
@@ -109,32 +109,8 @@ def _require_administrator(role: Role):
         raise ForbiddenHTTPException()
 
 def _require_moderator(role: Role):
-    if role != 'administrator' and role != 'moderator':
+    if role not in ('moderator', 'administrator'):
         raise ForbiddenHTTPException()
 
 Administrator = Annotated[None, Depends(_require_administrator)]
 Moderator = Annotated[None, Depends(_require_moderator)]
-
-def _get_optional_role(
-    session: Session,
-	username: Authorize
-) -> schema.Role:
-    if not username:
-        return 'user'
-
-    return security.get_role(session, username) or 'user'
-
-OptionalRole = Annotated[schema.Role, Depends(_get_optional_role)]
-
-def _get_user_profile(
-    session: Session,
-	username: Username
-) -> schema.UserProfile:
-    profile = usersvc.get_profile(session, username)
-
-    if not profile:
-        raise UnauthorizedHTTPException()
-
-    return profile
-
-Profile = Annotated[schema.UserProfile, Depends(_get_user_profile)]

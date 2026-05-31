@@ -3,7 +3,7 @@ from pwdlib.hashers.argon2 import Argon2Hasher
 from secrets import token_hex
 from jwt import PyJWT, InvalidKeyError, InvalidTokenError
 from time import time
-from config import AUTH_SECRET, TOKEN_SECRET, AUTH_EXPIRATION, AUTH_COST, TOKEN_EXPIRATION
+from config import AUTH_SECRET, TOKEN_SECRET, AUTH_EXPIRATION, TOKEN_EXPIRATION
 import schema, database as db
 from datetime import datetime
 from user_agents import parse as parse_useragent
@@ -13,7 +13,7 @@ ACCESS_COOKIE='access_token'
 REFRESH_COOKIE='refresh_token'
 
 jwt = PyJWT()
-argon2 = PasswordHash([Argon2Hasher(time_cost=4, memory_cost=AUTH_COST)])
+argon2 = PasswordHash([Argon2Hasher(time_cost=4, memory_cost=65536)])
 
 def compare(secret: str, hash: str) -> bool:
     return argon2.verify(secret + AUTH_SECRET, hash)
@@ -21,23 +21,23 @@ def compare(secret: str, hash: str) -> bool:
 def hash(secret: str, salted: bool = True) -> str:
     return argon2.hash(secret + AUTH_SECRET) if salted else argon2.hash(secret, salt=AUTH_SECRET.encode())
 
-def encode(token: dict) -> str:
+def encode(token: dict) -> schema.Jwt:
     return jwt.encode(token, TOKEN_SECRET, 'HS256')
 
-def decode(token: str) -> dict | None:
+def decode(token: schema.Jwt) -> dict | None:
     try:
         return jwt.decode(token, TOKEN_SECRET, 'HS256')
     except (InvalidKeyError, InvalidTokenError):
         return None
     
-def update_role(session: db.Session, user_role_update_payload: schema.UserRoleUpdate) -> bool:
+def set_role(session: db.Session, user_role_update_payload: schema.UserRoleUpdate) -> bool:
     return session.execute(db.update(db.User).where(db.User.username == user_role_update_payload.username).values(role=user_role_update_payload.role)).rowcount > 0
 
 def register(session: db.Session, user_registration_payload: schema.UserRegistration) -> schema.UserProfile | None:
     if session.execute(db.select(db.exists().where(db.User.username == user_registration_payload.username))).scalar():
         return None
 
-    creation_time = schema.format_datetime(datetime.now())
+    creation_date = schema.format_datetime(datetime.now())
     email = encode({'email': user_registration_payload.email}) if user_registration_payload.email else None
     email_hash = hash(user_registration_payload.email, False) if user_registration_payload.email else None
 
@@ -47,7 +47,7 @@ def register(session: db.Session, user_registration_payload: schema.UserRegistra
             username=user_registration_payload.username,
             password_hash=hash(user_registration_payload.password),
             role='user',
-            creation_time=creation_time,
+            creation_date=creation_date,
             email=email,
             email_hash=email_hash
         ))
@@ -57,22 +57,22 @@ def register(session: db.Session, user_registration_payload: schema.UserRegistra
         return schema.UserProfile(
             username=user_registration_payload.username,
             email=user_registration_payload.email,
-            creation_time=creation_time,
+            creation_date=creation_date,
             role='user'
         )
     except db.IntegrityError:
         return None
 
-def authorize(session: db.Session, user_authorization_payload: schema.UserAuthorization, user_agent: str | None = None) -> tuple[schema.RefreshToken, schema.AccessToken] | None:
+def authorize(session: db.Session, user_authorization_payload: schema.UserAuthorization, user_agent: str | None = None) -> tuple[schema.HexString, schema.Jwt] | None:
     if not session.query(db.exists().where(db.User.username == user_authorization_payload.username)).scalar():
         return None
     
-    device = "<Неизвестное устройство>"
+    device_name = "<Неизвестное устройство>"
     
     if user_agent:
         user_agent = parse_useragent(user_agent)
         user_agent: UserAgent
-        device = f"[{user_agent.os.family} | {user_agent.browser.family}] {user_agent.device.family}"
+        device_name = f"[{user_agent.os.family} | {user_agent.browser.family}] {user_agent.device.family}"
 
     password_hash = session.execute(db.select(db.User.password_hash).where(db.User.username == user_authorization_payload.username)).scalar()
 
@@ -88,9 +88,9 @@ def authorize(session: db.Session, user_authorization_payload: schema.UserAuthor
         session.add(db.Auth(
             refresh_token=refresh_token,
             username=user_authorization_payload.username,
-            device=device,
-            creation_time=schema.format_datetime(datetime.now()),
-            expiration_time = int(time() + AUTH_EXPIRATION)
+            device_name=device_name,
+            creation_date=schema.format_datetime(datetime.now()),
+            expiration_time = schema.Ufloat(time() + AUTH_EXPIRATION)
         ))
         
         session.flush()
@@ -98,21 +98,29 @@ def authorize(session: db.Session, user_authorization_payload: schema.UserAuthor
         return (refresh_token, encode({
             'username': user_authorization_payload.username,
             'refresh_token': refresh_token,
-            'expiration_time': int(time() + TOKEN_EXPIRATION)
+            'expiration_time': schema.Ufloat(time() + TOKEN_EXPIRATION)
         }))
     except db.IntegrityError:
         return None
     
-def sessions(session: db.Session, username: schema.Username) -> list[schema.UserSession]:
-    return session.execute(db.select(db.Auth.refresh_token, db.Auth.device, db.Auth.creation_time, db.Auth.expiration_time).where(db.Auth.username == username)).all()
+def get_user_sessions(session: db.Session, username: schema.Username) -> list[schema.UserSession]:
+    user_sessions = session.execute(db.select(db.Auth.username, db.Auth.refresh_token, db.Auth.device_name, db.Auth.creation_date, db.Auth.expiration_time).where(db.Auth.username == username)).all()
 
-def login(refresh_token: schema.RefreshToken, access_token: schema.AccessToken) -> schema.Username | None:
+    return [
+        schema.UserSession(
+            username=user_session[0],
+            refresh_token=user_session[1],
+            device_name=user_session[2],
+            creation_date=user_session[3],
+            expiration_time=user_session[4]
+        )
+        for user_session in user_sessions
+    ]
+
+def login(access_token: schema.Jwt) -> schema.Username | None:
     access_token = decode(access_token)
 
     if not access_token:
-        return None
-    
-    if access_token['refresh_token'] != refresh_token:
         return None
     
     if time() >= access_token['expiration_time']:
@@ -120,11 +128,14 @@ def login(refresh_token: schema.RefreshToken, access_token: schema.AccessToken) 
 
     return access_token['username']
     
-def logout(session: db.Session, refresh_token: schema.RefreshToken) -> bool:
+def logout(session: db.Session, refresh_token: schema.HexString) -> bool:
     return session.execute(db.delete(db.Auth).where(db.Auth.refresh_token == refresh_token)).rowcount > 0
 
-def update(session: db.Session, username: schema.Username, user_credentials_update_payload: schema.UserCredentialsUpdate, force: bool = False) -> bool:
-    if not force:
+def unauthorize(session: db.Session, username: schema.Username) -> bool:
+    return session.execute(db.delete(db.Auth).where(db.Auth.username == username)).rowcount > 0
+
+def update_credentials(session: db.Session, username: schema.Username, user_credentials_update_payload: schema.UserCredentialsUpdate, verify_old_password: bool = True) -> bool:
+    if verify_old_password:
         password_hash = session.execute(db.select(db.User.password_hash).where(db.User.username == username)).scalar()
 
         if not password_hash:
@@ -143,7 +154,7 @@ def update(session: db.Session, username: schema.Username, user_credentials_upda
         session.execute(db.delete(db.Auth).where(db.Auth.username == username))
         return True
     
-def refresh(session: db.Session, refresh_token: schema.RefreshToken) -> schema.AccessToken | None:
+def refresh(session: db.Session, refresh_token: schema.HexString) -> schema.Jwt | None:
     auth = session.execute(db.select(db.Auth.username, db.Auth.expiration_time).where(db.Auth.refresh_token == refresh_token)).first()
     
     if not auth:
@@ -157,57 +168,39 @@ def refresh(session: db.Session, refresh_token: schema.RefreshToken) -> schema.A
 
     return encode({
         'username': username,
-        'refresh_token': refresh_token,
-        'expiration_time': int(time() + TOKEN_EXPIRATION)
+        'expiration_time': schema.Ufloat(time() + TOKEN_EXPIRATION)
     })
 
 def get_role(session: db.Session, username: schema.Username) -> schema.Role | None:
     return session.execute(db.select(db.User.role).where(db.User.username == username)).scalar()
 
-recovery = {}
 
-def recovery_cleanup():
-    expired_tokens = [recovery_token for recovery_token, value in recovery.items() if time() >= value['expiration_time']]
-    for expired_token in expired_tokens:
-        del recovery[expired_token]
-
-def initiate_recover(session: db.Session, user_recovery_payload: schema.UserRecovery) -> schema.RecoveryToken | None:
-    recovery_cleanup()
-
+def initiate_recovery(session: db.Session, user_recovery_payload: schema.UserRecovery) -> schema.Jwt | None:
     email_hash = hash(user_recovery_payload.email, False)
     email = session.execute(db.select(db.User.email).where(db.User.username == user_recovery_payload.username, db.User.email_hash == email_hash)).scalar()
 
-    if not email:
-        return None
-    
-    email = decode(email)
-
-    if not email:
+    if not email or not (email := decode(email)):
         return None
     
     email = email['email']
 
     if email != user_recovery_payload.email:
         return None
-
-    recovery_token = token_hex(4)
-
-    if recovery_token in recovery:
-        return None
     
-    recovery[recovery_token] = {
+    return encode({
         'username': user_recovery_payload.username,
         'new_password': token_hex(16),
-        'expiration_time': int(time() + TOKEN_EXPIRATION)
-    }
+        'expiration_time': schema.Ufloat(time() + TOKEN_EXPIRATION)
+    })
 
-    return recovery_token
+def confirm_recovery(session: db.Session, recovery_token: schema.Jwt) -> schema.Password | None:
+    if not (recovery_token := decode(recovery_token)):
+        return None
 
-def recover(session: db.Session, recovery_token: schema.RecoveryToken) -> bool:
-    if recovery_token not in recovery:
-        return False
+    if time() >= recovery_token['expiration_time']:
+        return None
     
-    if session.execute(db.update(db.User).where(db.User.username == recovery[recovery_token]['username']).values(password_hash=hash(recovery[recovery_token]['new_password']))).rowcount > 0:
-        return True
-    else:
-        return False
+    if session.execute(db.update(db.User).where(db.User.username == recovery_token['username']).values(password_hash=hash(recovery_token['new_password']))).rowcount > 0:
+        return recovery_token['new_password']
+    
+    return None

@@ -21,14 +21,14 @@ def register(
         
     return user_profile
 
-@router.post('/login', response_model=schema.Tokens)
+@router.post('/login', response_model=schema.Authorization)
 def login(
     session: depends.Session,
     payload: schema.UserAuthorization,
     response: Response,
     cooldown: depends.Cooldown,
     user_agent: Annotated[str | None, Header()] = None
-) -> schema.Tokens:
+) -> schema.Authorization:
     """Вход в систему с установкой токенов авторизации в куках."""
 
     tokens = security.authorize(session, payload, user_agent)
@@ -42,27 +42,27 @@ def login(
         key=security.ACCESS_COOKIE,
         value=access_token,
         httponly=True,
-        samesite='lax' if config.DEBUG else 'none',
-        secure=not config.DEBUG
+        samesite='none',
+        secure=True
     )
 
     response.set_cookie(
         key=security.REFRESH_COOKIE,
         value=refresh_token,
         httponly=True,
-        samesite='lax' if config.DEBUG else 'none',
-        secure=not config.DEBUG
+        samesite='none',
+        secure=True
     )
 
-    return schema.Tokens(access_token=access_token, refresh_token=refresh_token)
+    return schema.Authorization(access_token=access_token, refresh_token=refresh_token)
 
-@router.post('/logout', status_code=status.HTTP_200_OK)
+@router.post('/logout')
 def logout(
     session: depends.Session,
     username: depends.Username,
     response: Response,
     cooldown: depends.Cooldown,
-    refresh_token_body: Annotated[schema.RefreshToken | None, Body(...)] = None,
+    refresh_token_body: Annotated[schema.HexString | None, Body(embed=True, alias='refresh_token')] = None,
     refresh_token_cookie: Annotated[str | None, Cookie(alias=security.REFRESH_COOKIE)] = None,
     refresh_token: Annotated[str | None, Header()] = None
 ):
@@ -70,20 +70,15 @@ def logout(
 
     refresh_token = refresh_token_body or refresh_token_cookie or refresh_token
 
-    print(refresh_token)
-
     if not refresh_token:
         return BadRequestHTTPException("Токен авторизации не предоставлен.")
 
     try:
-        refresh_token = TypeAdapter(schema.RefreshToken).validate_python(refresh_token)
+        refresh_token = TypeAdapter(schema.HexString).validate_python(refresh_token)
     except schema.ValidationError:
         return UnprocessableHTTPException("Неверный формат токена авторизации.")
 
-    print(refresh_token)
-    print(tuple(map(lambda user_session: user_session[0], security.sessions(session, username))))
-
-    if refresh_token not in tuple(map(lambda user_session: user_session[0], security.sessions(session, username))):
+    if refresh_token not in tuple(map(lambda user_session: user_session.refresh_token, security.get_user_sessions(session, username))):
         raise ForbiddenHTTPException("Вы не являетесь владельцем этого токена авторизации.")
 
     if security.logout(session, refresh_token):
@@ -93,23 +88,23 @@ def logout(
     else:
         raise UnknownHTTPException()
 
-@router.patch('/register', status_code=status.HTTP_200_OK)
+@router.patch('/register')
 def update(
     session: depends.Session,
     username: depends.Username,
     payload: schema.UserCredentialsUpdate
 ):
-    """Обновление пароля или E-mail авторизованного пользователя."""
+    """Обновление данных для входа авторизованного пользователя."""
 
     if not payload.new_password and not payload.new_email:
         return
     
-    if not security.update(session, username, payload):
+    if not security.update_credentials(session, username, payload):
         raise ForbiddenHTTPException("Не удалось обновить данные пользователя. Проверьте пароль.")
 
 @router.get('/sessions', response_model=list[schema.UserSession])
 def sessions(session: depends.Session, username: depends.Username):
-    return security.sessions(session, username)
+    return security.get_user_sessions(session, username)
 
 
 from typing import Annotated
@@ -117,7 +112,7 @@ from fastapi import Body, status
 from pydantic import TypeAdapter, ValidationError
 
 
-@router.post('/recover', status_code=status.HTTP_200_OK)
+@router.post('/recover')
 def recover(
     session: depends.Session,
     # payload: Annotated[dict | str, Body()],
@@ -135,7 +130,7 @@ def recover(
     try:
         user_recovery_payload = TypeAdapter(schema.UserRecovery).validate_python(payload)
         
-        recovery_token = security.initiate_recover(session, user_recovery_payload)
+        recovery_token = security.initiate_recovery(session, user_recovery_payload)
         
         if not recovery_token:
             raise UnauthorizedHTTPException("Неверные данные пользователя.")
@@ -145,9 +140,9 @@ def recover(
         pass
 
     try:
-        recovery_token = TypeAdapter(schema.RecoveryToken).validate_python(payload)
+        recovery_token = TypeAdapter(schema.Jwt).validate_python(payload)
         
-        if not security.recover(session, recovery_token):
+        if not security.confirm_recovery(session, recovery_token):
             raise NotFoundHTTPException("Срок действия токена истек или он не существует.")
             
         return
