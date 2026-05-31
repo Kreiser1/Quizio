@@ -78,7 +78,7 @@ def _authorize(
             key=security.ACCESS_COOKIE,
             value=access_token,
             httponly=True,
-            samesite='none',
+            samesite='lax',
             secure=True
         )
     

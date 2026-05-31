@@ -42,7 +42,7 @@ def login(
         key=security.ACCESS_COOKIE,
         value=access_token,
         httponly=True,
-        samesite='none',
+        samesite='lax',
         secure=True
     )
 
@@ -50,7 +50,7 @@ def login(
         key=security.REFRESH_COOKIE,
         value=refresh_token,
         httponly=True,
-        samesite='none',
+        samesite='lax',
         secure=True
     )
 
