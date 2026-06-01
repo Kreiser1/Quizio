@@ -12,7 +12,7 @@ def me(session: depends.Session, username: depends.Username):
     profile = usersvc.get_profile(session, username)
 
     if not profile:
-        return NotFoundHTTPException("Профиль не найден.")
+        raise NotFoundHTTPException("Профиль не найден.")
 
     return profile
 

@@ -20,7 +20,7 @@ router = APIRouter(prefix='/rooms', tags=['Комнаты'])
 def _hide_room_stream_answers(room_stream: schema.RoomStream, username: schema.Username):
     for user in room_stream.users:
         if user.username != username:
-            user.answers = set()
+            user.answered_questions = set()
             
     for team in room_stream.teams:
         for user in team.users:
