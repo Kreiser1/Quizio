@@ -1,7 +1,7 @@
 from typing import Annotated
 from fastapi import APIRouter, status, Path, Depends, Body
 from fastapi.responses import StreamingResponse
-import io
+import re
 
 import schema
 import depends
@@ -12,16 +12,22 @@ from exceptions import *
 
 router = APIRouter(prefix='/achievements', tags=['Достижения'])
 
+SAFE_PATTERN = re.compile(r'^(?!.*__)(?!.*\bpow\b)(?!.*<<)(?!.*>>)[a-zA-Z0-9.\s&|!=<>()[\]\x27\x22]+$')
+
 @router.post('', response_model=schema.Achievement, status_code=status.HTTP_201_CREATED)
 def create_achievement(
     session: depends.Session,
     moderator: depends.Moderator,
+    role: depends.Role,
     payload: schema.AchievementCreate
 ) -> schema.Achievement:
     """Создать новое достижение."""
     
     if isinstance(payload.icon, str) and len(payload.icon) > config.IMAGE_SIZE_LIMIT:
         raise UnprocessableHTTPException("Иконка слишком большая.")
+
+    if role != 'administrator' and (not SAFE_PATTERN.match(payload.condition) or len(payload.condition) > 128):
+        raise ForbiddenHTTPException("Условие слишком длинное или содержит запрещённые конструкции. Обратитесь к администратору.")        
 
     try:
         compile(payload.condition, "<string>", "eval")

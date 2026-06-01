@@ -1,6 +1,6 @@
 import sqlite3
 
-from sqlalchemy import create_engine, exists, select, update, insert, delete, func, and_
+from sqlalchemy import create_engine, exists, select, update, insert, delete, func, and_, or_, text
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship, sessionmaker, Session
 from sqlalchemy import String, Text, UniqueConstraint, CheckConstraint, Integer, Table, Column, ForeignKey, BigInteger
 from sqlalchemy.exc import IntegrityError
@@ -45,6 +45,9 @@ def connect() -> Generator[Session, None, None]:
             raise
         finally:
             session.close()
+
+with engine.connect() as conn:
+    conn.execute(text("PRAGMA foreign_keys = ON;"))
 
 
 from .models import *

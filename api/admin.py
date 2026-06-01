@@ -1,4 +1,4 @@
-from fastapi import APIRouter, status, Path
+from fastapi import APIRouter, status, Path, Query
 
 import database as db
 import security, schema, depends, usersvc, config
@@ -27,12 +27,9 @@ def update_role(session: depends.Session, payload: schema.UserRoleUpdate, admini
     return profile
 
 @router.patch('/users/{username}/credentials')
-def update_profile(session: depends.Session, payload: schema.UserCredentialsUpdate, administrator: depends.Administrator,
+def update_credentials(session: depends.Session, payload: schema.UserCredentialsUpdate, administrator: depends.Administrator,
        username: schema.Username = Path(...)):
     """Изменить данные для входа пользователя по имени."""
-
-    if isinstance(payload.avatar, str) and len(payload.avatar) > config.IMAGE_SIZE_LIMIT:
-        raise UnprocessableHTTPException("Аватар слишком большой.")
 
     if not security.update_credentials(session, username, payload, verify_old_password=False):
         raise NotFoundHTTPException("Не удалось обновить данные для входа пользователя. Проверьте имя.")
@@ -62,3 +59,15 @@ def delete_profile(session: depends.Session, administrator: depends.Administrato
 
     if not usersvc.delete_profile(session, username):
         raise NotFoundHTTPException("Профиль не найден.")
+    
+@router.get('/query', response_model=list[schema.UserProfile])
+def search_users(
+    session: depends.Session,
+    administrator: depends.Administrator,
+    query: schema.Name | None = Query(default=None),
+    count: schema.Uint = Query(default=25),
+    offset: schema.Uint = Query(default=0)
+) -> list[schema.QuizPreview]:
+    """Поиск пользователей по имени."""
+
+    return usersvc.search_users(session, query=query, count=count, offset=offset)

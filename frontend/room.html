@@ -1,750 +1,1082 @@
 <!doctype html>
 <html lang="en" color-scheme="dark">
-	<head>
-		<meta charset="UTF-8" />
-		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-		<title>Quizio - Комната</title>
-
-		<link rel="stylesheet" href="style.css" />
-		<link rel="stylesheet" href="classless.css" />
-		<script src="utils.js"></script>
-
-		<style>
-			.grid {
-				display: grid;
-				grid-template-columns: 1fr 300px;
-				grid-template-rows: 1fr auto;
-				gap: 20px;
-				height: calc(100vh - 40px);
-			}
-
-			.question {
-				grid-column: 1;
-				grid-row: 1;
-				overflow-y: auto;
-			}
-
-			.sidebar {
-				grid-column: 2;
-				grid-row: 1;
-				display: flex;
-				flex-direction: column;
-				gap: 20px;
-			}
-
-			.users {
-				flex: 1;
-				overflow-y: auto;
-			}
-
-			.teams {
-				flex: 1;
-				overflow-y: auto;
-			}
-
-			.answer-area {
-				grid-column: 1 / -1;
-				grid-row: 2;
-			}
-
-			.control-panel {
-				position: fixed;
-				bottom: 20px;
-				right: 20px;
-				background: rgba(0, 0, 0, 0.9);
-				border: 1px solid rgba(255, 255, 255, 0.2);
-				border-radius: 10px;
-				padding: 15px;
-				display: none;
-				flex-direction: column;
-				gap: 10px;
-				min-width: 200px;
-				z-index: 1000;
-			}
-
-			.control-panel.visible {
-				display: flex;
-			}
-
-			.control-toggle {
-				position: fixed;
-				bottom: 20px;
-				right: 20px;
-				z-index: 1001;
-				width: 40px;
-				height: 40px;
-				border-radius: 50%;
-				padding: 0;
-				font-size: 20px;
-				display: none;
-			}
-
-			.control-toggle.visible {
-				display: block;
-			}
-
-			.question-image {
-				max-width: 100%;
-				max-height: 300px;
-				margin: 10px 0;
-			}
-
-			.question-code {
-				background: rgba(0, 0, 0, 0.3);
-				padding: 15px;
-				border-radius: 5px;
-				margin: 10px 0;
-				white-space: pre-wrap;
-				font-family: monospace;
-			}
-
-			.answer-form {
-				display: flex;
-				gap: 10px;
-				align-items: stretch;
-			}
-
-			.answer-form input {
-				flex: 1;
-				height: auto;
-			}
-
-			.answer-form button {
-				white-space: nowrap;
-				height: auto;
-			}
-
-			.team-badge {
-				display: inline-block;
-				width: 12px;
-				height: 12px;
-				border-radius: 50%;
-				margin-right: 5px;
-			}
-
-			.user-disconnected {
-				opacity: 0.5;
-			}
-
-			.user-banned {
-				opacity: 0.3;
-				text-decoration: line-through;
-			}
-
-			#question-time {
-				font-size: 3em;
-				text-align: center;
-				margin: 20px 0;
-			}
-		</style>
-	</head>
-
-	<body class="grid">
-		<section class="glass question">
-			<h3 id="room-name">Загрузка комнаты...</h3>
-			<h1 id="question-time"></h1>
-			<div id="question-image-container" style="display: none">
-				<img id="question-image" class="question-image" />
-			</div>
-			<div id="question-code-container" style="display: none">
-				<pre id="question-code" class="question-code"></pre>
-			</div>
-			<p id="question-text"></p>
-			<div id="question-title" style="display: none">
-				<small id="question-title-text" style="color: #888"></small>
-			</div>
-		</section>
-
-		<div class="sidebar">
-			<section class="glass users">
-				<h4>Игроки</h4>
-				<table>
-					<thead>
-						<tr>
-							<th>Имя</th>
-							<th>Очки</th>
-							<th>Серия</th>
-						</tr>
-					</thead>
-					<tbody id="room-users"></tbody>
-				</table>
-			</section>
-
-			<section
-				class="glass teams"
-				id="teams-section"
-				style="display: none"
-			>
-				<h4>Команды</h4>
-				<div id="room-teams"></div>
-			</section>
-		</div>
-
-		<section class="glass answer-area">
-			<form class="answer-form" id="answer-form" onsubmit="return false;">
-				<input
-					type="text"
-					id="answer-input"
-					placeholder="Введите ответ..."
-					disabled
-				/>
-				<button type="submit" id="submit-answer" disabled>
-					Отправить
-				</button>
-			</form>
-			<div
-				id="answer-options"
-				style="display: none; margin-top: 10px"
-			></div>
-		</section>
-
-		<button id="control-toggle" class="control-toggle">⚙️</button>
-		<div id="control-panel" class="control-panel">
-			<h4 style="margin: 0">Управление</h4>
-			<select id="control-question-select">
-				<option value="">Выберите вопрос...</option>
-			</select>
-			<button id="control-show" class="primary">Показать вопрос</button>
-			<button id="control-start" class="success">Запустить таймер</button>
-			<button id="control-stop" class="warning">Остановить таймер</button>
-			<button id="control-end" class="danger">Завершить комнату</button>
-		</div>
-
-		<script>
-			(function () {
-				const frontend = "http://" + window.location.hostname;
-				const ws = "ws://" + window.location.hostname + "/api";
-
-				const room_name = document.getElementById("room-name");
-				const question_text = document.getElementById("question-text");
-				const question_title_text = document.getElementById(
-					"question-title-text",
-				);
-				const question_title =
-					document.getElementById("question-title");
-				const question_image =
-					document.getElementById("question-image");
-				const question_image_container = document.getElementById(
-					"question-image-container",
-				);
-				const question_code = document.getElementById("question-code");
-				const question_code_container = document.getElementById(
-					"question-code-container",
-				);
-				const room_users = document.getElementById("room-users");
-				const room_teams = document.getElementById("room-teams");
-				const teams_section = document.getElementById("teams-section");
-				const answer_form = document.getElementById("answer-form");
-				const answer_input = document.getElementById("answer-input");
-				const submit_answer = document.getElementById("submit-answer");
-				const answer_options =
-					document.getElementById("answer-options");
-
-				const control_toggle =
-					document.getElementById("control-toggle");
-				const control_panel = document.getElementById("control-panel");
-				const control_question_select = document.getElementById(
-					"control-question-select",
-				);
-				const control_show = document.getElementById("control-show");
-				const control_start = document.getElementById("control-start");
-				const control_stop = document.getElementById("control-stop");
-				const control_end = document.getElementById("control-end");
-
-				let currentUserRole = "user";
-				let currentQuestionType = null;
-				let currentQuestionIndex = null;
-				let timerInterval = null;
-				let questionTimeRemaining = null;
-				let quizData = null;
-				let roomData = null;
-
-				const query = Object.fromEntries(
-					new URLSearchParams(window.location.search).entries(),
-				);
-
-				if (!query.room_token) {
-					room_name.innerText = "Ошибка: токен комнаты не указан";
-					return;
-				}
-
-				// Load initial data
-				loadInitialData();
-
-				function loadInitialData() {
-					// Load user profile to get role
-					request_json(
-						"/users/me",
-						"GET",
-						null,
-						(userResponse) => {
-							currentUserRole = userResponse.role;
-							if (
-								userResponse.role === "moderator" ||
-								userResponse.role === "administrator"
-							) {
-								control_toggle.classList.add("visible");
-								loadRoomData();
-							} else {
-								// For regular users, just connect to WebSocket
-								connectWebSocket();
-							}
-						},
-						(error) => {
-							console.error("Failed to load profile:", error);
-							connectWebSocket();
-						},
-					);
-				}
-
-				function loadRoomData() {
-					// Get room data using the new endpoint
-					request_json(
-						`/rooms/${query.room_token}`,
-						"GET",
-						null,
-						(room) => {
-							console.log("Room data loaded:", room);
-							roomData = room;
-
-							// The quiz is already included in the Room response
-							if (room.quiz && room.quiz.questions) {
-								quizData = room.quiz;
-								populateQuestionSelect();
-							}
-
-							// Connect to WebSocket
-							connectWebSocket();
-						},
-						(error) => {
-							console.error("Failed to load room data:", error);
-							connectWebSocket();
-						},
-					);
-				}
-
-				function populateQuestionSelect() {
-					if (!quizData || !quizData.questions) {
-						console.error("No quiz data to populate questions");
-						return;
-					}
-
-					console.log(
-						"Populating questions:",
-						quizData.questions.length,
-					);
-
-					control_question_select.innerHTML =
-						'<option value="">Выберите вопрос...</option>';
-
-					quizData.questions.forEach((question, index) => {
-						const option = document.createElement("option");
-						option.value = index;
-						const preview = question.text
-							? question.text.substring(0, 50)
-							: "Без текста";
-						option.innerText = `Вопрос ${index + 1}: ${preview}${question.text && question.text.length > 50 ? "..." : ""}`;
-						control_question_select.appendChild(option);
-					});
-				}
-
-				// Control panel toggle
-				control_toggle.addEventListener("click", () => {
-					control_panel.classList.toggle("visible");
-				});
-
-				// Control buttons
-				control_show.addEventListener("click", () => {
-					const questionIndex = control_question_select.value;
-					if (questionIndex === "" || questionIndex === null) {
-						alert("Выберите вопрос");
-						return;
-					}
-
-					sendControlCommand("show", parseInt(questionIndex));
-				});
-
-				control_start.addEventListener("click", () => {
-					const questionIndex = control_question_select.value;
-					if (questionIndex === "" || questionIndex === null) {
-						alert("Выберите вопрос");
-						return;
-					}
-
-					sendControlCommand("start", parseInt(questionIndex));
-				});
-
-				control_stop.addEventListener("click", () => {
-					sendControlCommand("stop", null);
-				});
-
-				control_end.addEventListener("click", () => {
-					if (confirm("Вы уверены, что хотите завершить комнату?")) {
-						sendControlCommand("end", null);
-					}
-				});
-
-				function sendControlCommand(command, question) {
-					const payload = {
-						command: command,
-						question: question,
-					};
-
-					request_json(
-						`/rooms/${query.room_token}/control`,
-						"POST",
-						payload,
-						(response) => {
-							if (command === "end") {
-								setTimeout(() => {
-									window.location.href = "/";
-								}, 1000);
-							}
-						},
-						(error) => console.error("Control error:", error),
-					);
-				}
-
-				// Answer submission
-				answer_form.addEventListener("submit", (e) => {
-					e.preventDefault();
-					submitAnswer();
-				});
-
-				submit_answer.addEventListener("click", submitAnswer);
-
-				answer_input.addEventListener("keypress", (e) => {
-					if (e.key === "Enter") {
-						e.preventDefault();
-						submitAnswer();
-					}
-				});
-
-				function submitAnswer() {
-					const answer = answer_input.value.trim();
-					if (
-						(!answer && answer !== "0") ||
-						currentQuestionIndex === null
-					)
-						return;
-
-					let formattedAnswer = answer;
-
-					// Format answer based on question type
-					if (currentQuestionType === "select") {
-						formattedAnswer = parseInt(answer);
-						if (isNaN(formattedAnswer)) {
-							formattedAnswer = answer;
-						}
-					} else if (currentQuestionType === "multiselect") {
-						try {
-							// Try to parse as JSON array
-							formattedAnswer = JSON.parse(answer);
-						} catch {
-							// If not JSON, split by comma
-							formattedAnswer = answer.split(",").map((a) => {
-								const num = parseInt(a.trim());
-								return isNaN(num) ? a.trim() : num;
-							});
-						}
-					}
-
-					request_json(
-						`/rooms/${query.room_token}/answer`,
-						"POST",
-						{
-							question: currentQuestionIndex,
-							answer: formattedAnswer,
-						},
-						(response) => {
-							// Visual feedback
-							submit_answer.style.backgroundColor = response
-								? "#4CAF50"
-								: "#f44336";
-							setTimeout(() => {
-								submit_answer.style.backgroundColor = "";
-							}, 500);
-
-							if (response) {
-								answer_input.value = "";
-							}
-						},
-						(error) => {
-							console.error("Answer error:", error);
-						},
-					);
-				}
-
-				// WebSocket connection
-				function connectWebSocket() {
-					const socket = new WebSocket(
-						ws + `/rooms/${query.room_token}/stream`,
-					);
-
-					socket.onopen = () => {
-						console.log("WebSocket connected");
-					};
-
-					socket.onmessage = (event) => {
-						try {
-							const room_stream = JSON.parse(event.data);
-
-							if (
-								!room_stream ||
-								Object.keys(room_stream).length === 0
-							) {
-								// Room closed
-								window.location.href = "/";
-								return;
-							}
-
-							updateRoomDisplay(room_stream);
-						} catch (error) {
-							console.error("Parse error:", error);
-						}
-					};
-
-					socket.onerror = (error) => {
-						console.error("WebSocket error:", error);
-					};
-
-					socket.onclose = (event) => {
-						console.log(
-							"WebSocket closed:",
-							event.code,
-							event.reason,
-						);
-						if (event.code !== 1000) {
-							window.location.href = frontend;
-						}
-					};
-				}
-
-				function updateRoomDisplay(room_stream) {
-					// Update room name
-					room_name.innerText = room_stream.title;
-
-					// Update question display
-					if (room_stream.question_text) {
-						question_text.innerText = room_stream.question_text;
-						question_text.style.display = "block";
-						answer_input.disabled = false;
-						submit_answer.disabled = false;
-						currentQuestionIndex = room_stream.current_question;
-						currentQuestionType = room_stream.question_type;
-
-						// Update answer input placeholder based on type
-						if (currentQuestionType === "select") {
-							answer_input.placeholder =
-								"Введите номер ответа...";
-						} else if (currentQuestionType === "multiselect") {
-							answer_input.placeholder =
-								"Введите номера через запятую...";
-						} else {
-							answer_input.placeholder = "Введите ответ...";
-						}
-					} else {
-						question_text.innerText = "Ожидание вопроса...";
-						question_text.style.display = "block";
-						answer_input.disabled = true;
-						submit_answer.disabled = true;
-						currentQuestionIndex = null;
-						currentQuestionType = null;
-						answer_input.placeholder = "Введите ответ...";
-					}
-
-					// Update question title
-					if (room_stream.question_title) {
-						question_title_text.innerText =
-							room_stream.question_title;
-						question_title.style.display = "block";
-					} else {
-						question_title.style.display = "none";
-					}
-
-					// Update question image
-					if (room_stream.question_image) {
-						question_image.src =
-							"data:image/png;base64," +
-							room_stream.question_image;
-						question_image_container.style.display = "block";
-					} else {
-						question_image_container.style.display = "none";
-					}
-
-					// Update question code
-					if (room_stream.question_code) {
-						question_code.innerText = room_stream.question_code;
-						question_code_container.style.display = "block";
-					} else {
-						question_code_container.style.display = "none";
-					}
-
-					// Update timer
-					updateTimer(room_stream.question_time);
-
-					// Update users list
-					if (room_stream.users) {
-						updateUsersList(room_stream.users);
-					}
-
-					// Update teams if exist
-					if (room_stream.teams && room_stream.teams.length > 0) {
-						updateTeamsList(room_stream.teams);
-						teams_section.style.display = "block";
-					} else {
-						teams_section.style.display = "none";
-					}
-
-					// Update question select for controls
-					if (
-						currentUserRole === "moderator" ||
-						currentUserRole === "administrator"
-					) {
-						if (
-							room_stream.current_question !== null &&
-							room_stream.current_question !== undefined
-						) {
-							control_question_select.value =
-								room_stream.current_question;
-						}
-					}
-				}
-
-				function updateTimer(time) {
-					clearInterval(timerInterval);
-
-					if (time && time > 0) {
-						questionTimeRemaining = time;
-						updateTimerDisplay();
-
-						timerInterval = setInterval(() => {
-							questionTimeRemaining -= 0.1;
-							if (questionTimeRemaining <= 0) {
-								questionTimeRemaining = 0;
-								clearInterval(timerInterval);
-							}
-							updateTimerDisplay();
-						}, 100);
-					} else {
-						questionTimeRemaining = null;
-						updateTimerDisplay();
-					}
-				}
-
-				function updateTimerDisplay() {
-					const timerElement =
-						document.getElementById("question-time");
-
-					if (
-						questionTimeRemaining !== null &&
-						questionTimeRemaining > 0
-					) {
-						const minutes = Math.floor(questionTimeRemaining / 60);
-						const seconds = Math.floor(questionTimeRemaining % 60);
-						const tenths = Math.floor(
-							(questionTimeRemaining % 1) * 10,
-						);
-						timerElement.innerText = `${minutes}:${seconds.toString().padStart(2, "0")}.${tenths}`;
-						timerElement.style.display = "block";
-
-						// Color changes based on time remaining
-						if (questionTimeRemaining <= 10) {
-							timerElement.style.color = "#f44336";
-						} else if (questionTimeRemaining <= 30) {
-							timerElement.style.color = "#ff9800";
-						} else {
-							timerElement.style.color = "";
-						}
-					} else {
-						timerElement.innerText = "";
-						timerElement.style.display = "none";
-					}
-				}
-
-				function updateUsersList(users) {
-					room_users.innerHTML = "";
-
-					if (!users || users.length === 0) {
-						const row = room_users.insertRow();
-						const cell = row.insertCell();
-						cell.colSpan = 3;
-						cell.innerText = "Нет игроков";
-						cell.style.textAlign = "center";
-						return;
-					}
-
-					// Sort by score descending
-					const sortedUsers = [...users].sort(
-						(a, b) => b.score - a.score,
-					);
-
-					for (const user of sortedUsers) {
-						const row = room_users.insertRow();
-
-						// Apply connection state classes
-						if (user.connection_state === "disconnected") {
-							row.classList.add("user-disconnected");
-						} else if (user.connection_state === "banned") {
-							row.classList.add("user-banned");
-						}
-
-						// Username with status indicator
-						const nameCell = row.insertCell(0);
-						let statusIndicator = "";
-						if (user.connection_state === "connected") {
-							statusIndicator = "🟢 ";
-						} else if (user.connection_state === "disconnected") {
-							statusIndicator = "🟡 ";
-						} else if (user.connection_state === "banned") {
-							statusIndicator = "🔴 ";
-						}
-						nameCell.innerHTML = `${statusIndicator}${user.full_name ?? user.username}`;
-
-						// Score
-						row.insertCell(1).innerText = user.score;
-
-						// Answer streak
-						row.insertCell(2).innerText = user.answers_streak || 0;
-					}
-				}
-
-				function updateTeamsList(teams) {
-					room_teams.innerHTML = "";
-
-					for (const team of teams) {
-						const teamDiv = document.createElement("div");
-						teamDiv.style.marginBottom = "15px";
-						teamDiv.style.padding = "10px";
-						teamDiv.style.borderLeft = `3px solid ${team.color}`;
-
-						const teamHeader = document.createElement("div");
-						teamHeader.style.display = "flex";
-						teamHeader.style.justifyContent = "space-between";
-						teamHeader.style.marginBottom = "5px";
-
-						const teamName = document.createElement("strong");
-						teamName.innerText = team.title || "Без названия";
-						teamName.style.color = team.color;
-
-						const teamScore = document.createElement("span");
-						teamScore.innerText = `Очки: ${team.score}`;
-
-						teamHeader.appendChild(teamName);
-						teamHeader.appendChild(teamScore);
-						teamDiv.appendChild(teamHeader);
-
-						const usersList = document.createElement("div");
-						usersList.style.fontSize = "14px";
-						usersList.innerText = team.users
-							.map((u) => u.username)
-							.join(", ");
-						teamDiv.appendChild(usersList);
-
-						room_teams.appendChild(teamDiv);
-					}
-				}
-			})();
-		</script>
-	</body>
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Quizio - Комната</title>
+
+        <link rel="stylesheet" href="theme.css" />
+        <link
+            rel="stylesheet"
+            href="github-dark.css"
+        />
+
+        <script src="utils.js"></script>
+        <script src="highlight.js"></script>
+
+        <style>
+            .question-image {
+                max-width: 100%;
+                max-height: 300px;
+                margin: 10px 0;
+                border-radius: var(--border-radius);
+            }
+
+            .question-code {
+                background: rgba(0, 0, 0, 0.3);
+                padding: 15px;
+                border-radius: var(--border-radius);
+                margin: 10px 0;
+                overflow-x: auto;
+                max-width: 100%;
+            }
+
+            .question-code pre {
+                margin: 0;
+                padding: 0;
+                background: transparent;
+                font-family: "Fira Code", "Courier New", monospace;
+                font-size: 14px;
+                line-height: 1.5;
+            }
+
+            .question-code code {
+                background: transparent;
+                padding: 0;
+                font-family: inherit;
+            }
+
+            /* Highlight.js theme customization */
+            .hljs {
+                background: transparent !important;
+            }
+
+            .answer-buttons {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 10px;
+                margin-top: 10px;
+            }
+
+            .answer-btn {
+                min-width: 60px;
+                padding: 12px 20px;
+                font-size: 18px;
+                font-weight: bold;
+                cursor: pointer;
+            }
+
+            .answer-btn.selected {
+                background: var(--gradient-success);
+                transform: scale(1.05);
+            }
+
+            .user-disconnected {
+                opacity: 0.5;
+            }
+
+            .user-banned {
+                opacity: 0.3;
+                text-decoration: line-through;
+            }
+
+            .team-item {
+                margin-bottom: 15px;
+                padding: 10px;
+                border-left: 3px solid;
+                background: rgba(0, 0, 0, 0.2);
+                border-radius: var(--border-radius);
+            }
+
+            #question-time {
+                font-size: 3em;
+                text-align: center;
+                margin: 10px 0;
+                font-weight: bold;
+                font-family: monospace;
+            }
+
+            .control-panel {
+                position: fixed;
+                bottom: 20px;
+                right: 20px;
+                background: var(--card-bg);
+                border: 1px solid var(--border-color);
+                border-radius: var(--border-radius-lg);
+                padding: 15px;
+                display: none;
+                flex-direction: column;
+                gap: 10px;
+                min-width: 260px;
+                z-index: 1000;
+                box-shadow: var(--shadow-lg);
+            }
+
+            .control-panel.visible {
+                display: flex;
+            }
+
+            .control-toggle {
+                position: fixed;
+                bottom: 20px;
+                right: 20px;
+                z-index: 1001;
+                width: 50px;
+                height: 50px;
+                border-radius: 50%;
+                padding: 0;
+                font-size: 24px;
+                display: none;
+                background: var(--gradient-primary);
+            }
+
+            .control-toggle.visible {
+                display: block;
+            }
+
+            .answer-form {
+                display: flex;
+                gap: 10px;
+                width: 100%;
+            }
+
+            .answer-form input {
+                flex: 1;
+                width: 100%;
+                padding: 12px 16px;
+                font-size: 16px;
+                box-sizing: border-box;
+            }
+
+            .answer-form button {
+                padding: 12px 24px;
+                white-space: nowrap;
+            }
+
+            #answer-input-area {
+                width: 100%;
+            }
+
+            .timer-warning {
+                color: crimson;
+                animation: pulse 1s infinite;
+            }
+
+            @keyframes pulse {
+                0%,
+                100% {
+                    opacity: 1;
+                }
+                50% {
+                    opacity: 0.5;
+                }
+            }
+
+            .main {
+                overflow-x: hidden;
+            }
+        </style>
+    </head>
+
+    <body>
+        <section class="nav glass">
+            <h1>Quizio</h1>
+            <a href="/"><h4>🏠 Главная</h4></a>
+            <a href="/profile.html"><h4>👤 Профиль</h4></a>
+            <a href="/achievements.html"><h4>🏆 Достижения</h4></a>
+            <a href="/quizzes.html"><h4>📚 Викторины</h4></a>
+            <a href="/admin.html" id="admin-btn" style="display: none"
+                ><h4>👑 Администрирование</h4></a
+            >
+        </section>
+
+        <section class="profile glass">
+            <a href="/profile.html"
+                ><img id="profile-avatar" class="small-picture"
+            /></a>
+            <h3 id="profile-name" style="margin-left: 10px"></h3>
+        </section>
+
+        <section class="main glass">
+            <h3 id="room-name">Загрузка комнаты...</h3>
+            <div id="question-time-container" style="display: none">
+                <div id="question-time"></div>
+            </div>
+            <div id="question-image-container" style="display: none">
+                <img id="question-image" class="question-image" />
+            </div>
+            <div id="question-code-container" style="display: none">
+                <pre id="question-code" class="question-code"></pre>
+            </div>
+            <p id="question-text" style="font-size: 1.2em"></p>
+            <div id="question-title" style="display: none">
+                <small
+                    id="question-title-text"
+                    style="color: var(--secondary)"
+                ></small>
+            </div>
+
+            <div class="answer-area" style="margin-top: 20px; width: 100%">
+                <div id="answer-input-area" style="display: none; width: 100%">
+                    <form
+                        class="answer-form"
+                        id="answer-form"
+                        onsubmit="return false;"
+                        style="width: 100%"
+                    >
+                        <input
+                            type="text"
+                            id="answer-input"
+                            placeholder="✏️ Введите ответ..."
+                            disabled
+                        />
+                        <button type="submit" id="submit-answer" disabled>
+                            📤 Отправить
+                        </button>
+                    </form>
+                </div>
+                <div id="answer-buttons-area" style="display: none">
+                    <div id="answer-buttons" class="answer-buttons"></div>
+                    <button
+                        id="submit-multiselect"
+                        class="success"
+                        style="margin-top: 10px; display: none"
+                    >
+                        ✅ Отправить
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <section class="side glass scroll" style="overflow-y: auto">
+            <h4>👥 Игроки</h4>
+            <div style="overflow-x: auto">
+                <table style="width: 100%">
+                    <thead>
+                        <tr>
+                            <th>Имя</th>
+                            <th>Очки</th>
+                            <th>Серия</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody id="room-users"></tbody>
+                </table>
+            </div>
+
+            <div id="teams-section" style="display: none; margin-top: 20px">
+                <h4>👥 Команды</h4>
+                <div id="room-teams"></div>
+            </div>
+        </section>
+
+        <button id="control-toggle" class="control-toggle">⚙️</button>
+        <div id="control-panel" class="control-panel">
+            <h4 style="margin: 0 0 10px 0">🎮 Управление</h4>
+            <select id="control-question-select">
+                <option value="">📋 Выберите вопрос...</option>
+            </select>
+            <button id="control-show" class="primary">👁️ Показать</button>
+            <button id="control-start" class="success">▶️ Старт</button>
+            <button id="control-stop" class="warning">⏸️ Стоп</button>
+            <button id="control-hide" class="outline">🙈 Скрыть</button>
+            <button id="control-end" class="danger">🔚 Завершить</button>
+        </div>
+
+        <script>
+            (function () {
+                const ws =
+                    (window.location.protocol === "https:" ? "wss:" : "ws:") +
+                    "//" +
+                    window.location.hostname +
+                    "/api";
+
+                const roomNameEl = document.getElementById("room-name");
+                const questionTextEl = document.getElementById("question-text");
+                const questionTitleTextEl = document.getElementById(
+                    "question-title-text",
+                );
+                const questionTitleEl =
+                    document.getElementById("question-title");
+                const questionImageEl =
+                    document.getElementById("question-image");
+                const questionImageContainer = document.getElementById(
+                    "question-image-container",
+                );
+                const questionCodeContainer = document.getElementById(
+                    "question-code-container",
+                );
+                const questionTimeContainer = document.getElementById(
+                    "question-time-container",
+                );
+                const questionTimeEl = document.getElementById("question-time");
+                const roomUsersEl = document.getElementById("room-users");
+                const roomTeamsEl = document.getElementById("room-teams");
+                const teamsSection = document.getElementById("teams-section");
+
+                const answerInputArea =
+                    document.getElementById("answer-input-area");
+                const answerButtonsArea = document.getElementById(
+                    "answer-buttons-area",
+                );
+                const answerForm = document.getElementById("answer-form");
+                const answerInput = document.getElementById("answer-input");
+                const submitAnswerBtn =
+                    document.getElementById("submit-answer");
+                const answerButtonsDiv =
+                    document.getElementById("answer-buttons");
+
+                let currentUserRole = "user";
+                let currentUsername = "";
+                let currentQuestionType = null;
+                let currentQuestionIndex = null;
+                let currentHint = null;
+                let selectedAnswers = new Set();
+                let currentRoomToken = null;
+                let currentQuizId = null;
+                let quizQuestions = [];
+                let lastQuestionIndex = null;
+                let isSubmitting = false;
+
+                const query = new URLSearchParams(window.location.search);
+                currentRoomToken = query.get("token");
+
+                if (!currentRoomToken) {
+                    roomNameEl.innerText = "❌ Ошибка: токен комнаты не указан";
+                    return;
+                }
+
+                function getImageUrl(icon) {
+                    if (typeof icon === "number") {
+                        return load_preset(`${icon}.png`);
+                    } else if (typeof icon === "string" && icon.length > 0) {
+                        return `data:image/png;base64,${icon}`;
+                    }
+                    return null;
+                }
+
+                function getRoleColor(role) {
+                    return role === "administrator"
+                        ? "crimson"
+                        : role === "moderator"
+                          ? "#f59e0b"
+                          : "#10b981";
+                }
+
+                function highlightCode(element, code) {
+                    if (!element) return;
+
+                    const pre = document.createElement("pre");
+                    pre.style.whiteSpace = "pre-wrap";
+                    pre.style.wordWrap = "break-word";
+                    pre.style.overflowWrap = "break-word";
+                    pre.style.maxWidth = "100%";
+
+                    const codeEl = document.createElement("code");
+                    codeEl.textContent = code;
+                    codeEl.style.whiteSpace = "pre-wrap";
+                    codeEl.style.wordWrap = "break-word";
+                    codeEl.style.overflowWrap = "break-word";
+                    codeEl.style.display = "block";
+                    codeEl.style.maxWidth = "100%";
+                    codeEl.textContent = code;
+                    pre.appendChild(codeEl);
+
+                    element.innerHTML = "";
+                    element.appendChild(pre);
+
+                    if (typeof hljs !== "undefined") {
+                        try {
+                            hljs.highlightElement(codeEl);
+                        } catch (e) {
+                            console.warn("Highlight.js error:", e);
+                        }
+                    }
+                }
+
+                function loadProfile() {
+                    UsersAPI.get_profile(
+                        (profile) => {
+                            currentUsername = profile.username;
+                            currentUserRole = profile.role;
+
+                            const nameElement =
+                                document.getElementById("profile-name");
+                            nameElement.textContent =
+                                profile.nickname || profile.username;
+                            nameElement.style.color = getRoleColor(
+                                profile.role,
+                            );
+
+                            const avatarUrl = getImageUrl(profile.avatar);
+                            const avatarElement =
+                                document.getElementById("profile-avatar");
+                            if (avatarUrl) {
+                                avatarElement.src = avatarUrl;
+                                avatarElement.onerror = () =>
+                                    (avatarElement.style.display = "none");
+                            } else {
+                                avatarElement.style.display = "none";
+                            }
+
+                            const adminBtn =
+                                document.getElementById("admin-btn");
+                            if (adminBtn) {
+                                adminBtn.style.display =
+                                    currentUserRole === "administrator"
+                                        ? "block"
+                                        : "none";
+                            }
+
+                            if (
+                                currentUserRole === "moderator" ||
+                                currentUserRole === "administrator"
+                            ) {
+                                const controlToggle =
+                                    document.getElementById("control-toggle");
+                                if (controlToggle)
+                                    controlToggle.classList.add("visible");
+                                loadRoomPreview();
+                            } else {
+                                connectWebSocket();
+                            }
+                        },
+                        (error) => {
+                            console.error("Failed to load profile:", error);
+                            connectWebSocket();
+                        },
+                    );
+                }
+
+                function loadRoomPreview() {
+                    RoomsAPI.get(
+                        currentRoomToken,
+                        (roomPreview) => {
+                            if (roomPreview.quiz && roomPreview.quiz.id) {
+                                currentQuizId = roomPreview.quiz.id;
+                                loadQuizQuestions(currentQuizId);
+                            }
+                            connectWebSocket();
+                        },
+                        (error) => {
+                            console.error(
+                                "Failed to load room preview:",
+                                error,
+                            );
+                            connectWebSocket();
+                        },
+                    );
+                }
+
+                function loadQuizQuestions(quizId) {
+                    QuizzesAPI.get(
+                        quizId,
+                        (quiz) => {
+                            quizQuestions = quiz.questions;
+                            const controlQuestionSelect =
+                                document.getElementById(
+                                    "control-question-select",
+                                );
+                            if (controlQuestionSelect) {
+                                populateQuestionSelect(
+                                    controlQuestionSelect,
+                                    quizQuestions,
+                                );
+                            }
+                        },
+                        (error) => {
+                            console.error(
+                                "Failed to load quiz questions:",
+                                error,
+                            );
+                        },
+                    );
+                }
+
+                function populateQuestionSelect(selectElement, questions) {
+                    selectElement.innerHTML =
+                        '<option value="">📋 Выберите вопрос...</option>';
+                    questions.forEach((question, index) => {
+                        const option = document.createElement("option");
+                        option.value = index;
+                        const preview = question.text
+                            ? question.text.substring(0, 50)
+                            : "Без текста";
+                        option.innerText = `${index + 1}: ${preview}${question.text && question.text.length > 50 ? "..." : ""}`;
+                        selectElement.appendChild(option);
+                    });
+                }
+
+                const controlToggle = document.getElementById("control-toggle");
+                const controlPanel = document.getElementById("control-panel");
+                const controlQuestionSelect = document.getElementById(
+                    "control-question-select",
+                );
+                const controlShow = document.getElementById("control-show");
+                const controlStart = document.getElementById("control-start");
+                const controlStop = document.getElementById("control-stop");
+                const controlHide = document.getElementById("control-hide");
+                const controlEnd = document.getElementById("control-end");
+
+                if (controlToggle && controlPanel) {
+                    controlToggle.addEventListener("click", () => {
+                        controlPanel.classList.toggle("visible");
+                    });
+                }
+
+                if (controlShow) {
+                    controlShow.addEventListener("click", () => {
+                        const questionIndex = controlQuestionSelect
+                            ? controlQuestionSelect.value
+                            : "";
+                        if (questionIndex === "") {
+                            alert("Выберите вопрос");
+                            return;
+                        }
+                        sendControlCommand("show", parseInt(questionIndex));
+                    });
+                }
+
+                if (controlStart) {
+                    controlStart.addEventListener("click", () => {
+                        const questionIndex = controlQuestionSelect
+                            ? controlQuestionSelect.value
+                            : "";
+                        if (questionIndex === "") {
+                            alert("Выберите вопрос");
+                            return;
+                        }
+                        sendControlCommand("start", parseInt(questionIndex));
+                    });
+                }
+
+                if (controlStop) {
+                    controlStop.addEventListener("click", () => {
+                        sendControlCommand("stop", null);
+                    });
+                }
+
+                if (controlHide) {
+                    controlHide.addEventListener("click", () => {
+                        sendControlCommand("hide", null);
+                    });
+                }
+
+                if (controlEnd) {
+                    controlEnd.addEventListener("click", () => {
+                        if (
+                            confirm("Вы уверены, что хотите завершить комнату?")
+                        ) {
+                            sendControlCommand("shutdown", null);
+                            setTimeout(() => {
+                                window.location.href = "/";
+                            }, 1000);
+                        }
+                    });
+                }
+
+                function sendControlCommand(command, question) {
+                    const payload = { command: command };
+                    if (question !== null) payload.question = question;
+
+                    RoomsAPI.control(
+                        currentRoomToken,
+                        payload,
+                        () => {},
+                        (error) => console.error("Control error:", error),
+                    );
+                }
+
+                function banUser(username) {
+                    if (confirm(`❓ Забанить пользователя "${username}"?`)) {
+                        RoomsAPI.ban_user(
+                            currentRoomToken,
+                            username,
+                            () => {},
+                            (error) => console.error("Ban error:", error),
+                        );
+                    }
+                }
+
+                function unbanUser(username) {
+                    if (confirm(`❓ Разбанить пользователя "${username}"?`)) {
+                        RoomsAPI.unban_user(
+                            currentRoomToken,
+                            username,
+                            () => {},
+                            (error) => console.error("Unban error:", error),
+                        );
+                    }
+                }
+
+                function createAnswerButtons(hint, questionType) {
+                    answerButtonsDiv.innerHTML = "";
+                    selectedAnswers.clear();
+
+                    if (!hint || hint.length === 0) return;
+
+                    const sortedHint = [...hint].sort((a, b) => a - b);
+
+                    sortedHint.forEach((value) => {
+                        const btn = document.createElement("button");
+                        btn.textContent = value;
+                        btn.className = "answer-btn primary";
+                        btn.onclick = () => {
+                            if (questionType === "select") {
+                                document
+                                    .querySelectorAll(".answer-btn")
+                                    .forEach((b) =>
+                                        b.classList.remove("selected"),
+                                    );
+                                btn.classList.add("selected");
+                                selectedAnswers.clear();
+                                selectedAnswers.add(value);
+                                submitAnswer(Array.from(selectedAnswers)[0]);
+                            } else {
+                                if (selectedAnswers.has(value)) {
+                                    selectedAnswers.delete(value);
+                                    btn.classList.remove("selected");
+                                } else {
+                                    selectedAnswers.add(value);
+                                    btn.classList.add("selected");
+                                }
+                            }
+                        };
+                        answerButtonsDiv.appendChild(btn);
+                    });
+
+                    const submitBtn =
+                        document.getElementById("submit-multiselect");
+                    if (submitBtn) {
+                        if (questionType === "multiselect") {
+                            submitBtn.style.display = "block";
+                            const newSubmitBtn = submitBtn.cloneNode(true);
+                            submitBtn.parentNode.replaceChild(
+                                newSubmitBtn,
+                                submitBtn,
+                            );
+                            newSubmitBtn.onclick = () => {
+                                if (selectedAnswers.size > 0) {
+                                    const answersArray =
+                                        Array.from(selectedAnswers);
+                                    console.log(
+                                        "Multiselect submitting:",
+                                        answersArray,
+                                    );
+                                    submitAnswer(answersArray);
+                                } else {
+                                    console.log(
+                                        "No answers selected for multiselect",
+                                    );
+                                }
+                            };
+                        } else {
+                            submitBtn.style.display = "none";
+                        }
+                    }
+                }
+
+                function submitAnswer(answer) {
+                    if (currentQuestionIndex === null) {
+                        console.log("No active question");
+                        return;
+                    }
+
+                    if (isSubmitting) {
+                        console.log("Already submitting, ignoring...");
+                        return;
+                    }
+
+                    isSubmitting = true;
+
+                    console.log(
+                        "Submit - Type:",
+                        currentQuestionType,
+                        "Answer:",
+                        answer,
+                    );
+
+                    let formattedAnswer;
+
+                    if (currentQuestionType === "select") {
+                        formattedAnswer =
+                            typeof answer === "number"
+                                ? answer
+                                : parseInt(answer);
+                    } else if (currentQuestionType === "multiselect") {
+                        formattedAnswer = answer.map((v) =>
+                            typeof v === "number" ? v : parseInt(v),
+                        );
+                        console.log("Formatted multiselect:", formattedAnswer);
+                    } else {
+                        formattedAnswer = answer;
+                    }
+
+                    RoomsAPI.submit_answer(
+                        currentRoomToken,
+                        {
+                            question: currentQuestionIndex,
+                            answer: formattedAnswer,
+                        },
+                        (isCorrect) => {
+                            console.log("Result:", isCorrect);
+                            isSubmitting = false;
+
+                            if (currentQuestionType === "select") {
+                                const btns =
+                                    document.querySelectorAll(".answer-btn");
+                                btns.forEach((btn) => {
+                                    const btnValue = parseInt(btn.textContent);
+                                    if (
+                                        btnValue ===
+                                        (typeof answer === "number"
+                                            ? answer
+                                            : parseInt(answer))
+                                    ) {
+                                        btn.style.backgroundColor = isCorrect
+                                            ? "#10b981"
+                                            : "crimson";
+                                        setTimeout(() => {
+                                            btn.style.backgroundColor = "";
+                                            btn.classList.remove("selected");
+                                        }, 500);
+                                    }
+                                });
+                                selectedAnswers.clear();
+                            } else if (currentQuestionType === "multiselect") {
+                                const btns =
+                                    document.querySelectorAll(".answer-btn");
+                                btns.forEach((btn) => {
+                                    const btnValue = parseInt(btn.textContent);
+                                    if (selectedAnswers.has(btnValue)) {
+                                        btn.style.backgroundColor = isCorrect
+                                            ? "#10b981"
+                                            : "crimson";
+                                        setTimeout(() => {
+                                            btn.style.backgroundColor = "";
+                                        }, 500);
+                                    }
+                                });
+                                setTimeout(() => {
+                                    selectedAnswers.clear();
+                                    document
+                                        .querySelectorAll(".answer-btn")
+                                        .forEach((b) =>
+                                            b.classList.remove("selected"),
+                                        );
+                                }, 500);
+                            } else {
+                                submitAnswerBtn.style.backgroundColor =
+                                    isCorrect ? "#10b981" : "crimson";
+                                setTimeout(() => {
+                                    submitAnswerBtn.style.backgroundColor = "";
+                                }, 500);
+                                if (isCorrect) {
+                                    answerInput.value = "";
+                                }
+                            }
+                        },
+                        (error) => {
+                            console.error("Submit error:", error);
+                            isSubmitting = false;
+                        },
+                    );
+                }
+
+                if (answerForm) {
+                    answerForm.addEventListener("submit", (e) => {
+                        e.preventDefault();
+                        const answer = answerInput.value.trim();
+                        if (answer && !isSubmitting) {
+                            submitAnswer(answer);
+                        }
+                    });
+                }
+
+                if (submitAnswerBtn) {
+                    submitAnswerBtn.addEventListener("click", () => {
+                        const answer = answerInput.value.trim();
+                        if (answer && !isSubmitting) {
+                            submitAnswer(answer);
+                        }
+                    });
+                }
+
+                function connectWebSocket() {
+                    const socket = new WebSocket(
+                        ws + `/rooms/${currentRoomToken}/stream`,
+                    );
+
+                    socket.onopen = () => console.log("WebSocket connected");
+
+                    socket.onmessage = (event) => {
+                        try {
+                            const roomStream = JSON.parse(event.data);
+                            if (
+                                !roomStream ||
+                                Object.keys(roomStream).length === 0
+                            ) {
+                                window.location.href = "/";
+                                return;
+                            }
+                            updateRoomDisplay(roomStream);
+                        } catch (error) {
+                            console.error("Parse error:", error);
+                        }
+                    };
+
+                    socket.onerror = (error) =>
+                        console.error("WebSocket error:", error);
+
+                    socket.onclose = (event) => {
+                        console.log(
+                            "WebSocket closed:",
+                            event.code,
+                            event.reason,
+                        );
+                        if (event.code !== 1000) {
+                            window.location.href = "/";
+                        }
+                    };
+                }
+
+                let questionTimeRemaining = null;
+
+                function updateTimerDisplay() {
+                    if (
+                        questionTimeRemaining !== null &&
+                        questionTimeRemaining > 0
+                    ) {
+                        const minutes = Math.floor(questionTimeRemaining / 60);
+                        const seconds = Math.floor(questionTimeRemaining % 60);
+                        const tenths = Math.floor(
+                            (questionTimeRemaining % 1) * 10,
+                        );
+                        questionTimeEl.innerText = `${minutes}:${seconds.toString().padStart(2, "0")}.${tenths}`;
+
+                        if (questionTimeRemaining <= 10) {
+                            questionTimeEl.classList.add("timer-warning");
+                        } else {
+                            questionTimeEl.classList.remove("timer-warning");
+                        }
+                    } else {
+                        questionTimeEl.innerText = "";
+                    }
+                }
+
+                function updateRoomDisplay(roomStream) {
+                    roomNameEl.innerText = roomStream.title || "Комната";
+
+                    if (
+                        roomStream.time !== undefined &&
+                        roomStream.time !== null &&
+                        roomStream.time > 0
+                    ) {
+                        questionTimeRemaining = roomStream.time;
+                        updateTimerDisplay();
+                        questionTimeContainer.style.display = "block";
+                    } else {
+                        questionTimeRemaining = null;
+                        questionTimeContainer.style.display = "none";
+                    }
+
+                    if (roomStream.text && roomStream.text !== "<default>") {
+                        questionTextEl.innerText = roomStream.text;
+
+                        const questionChanged =
+                            lastQuestionIndex !== roomStream.question;
+                        lastQuestionIndex = roomStream.question;
+
+                        currentQuestionIndex = roomStream.question;
+                        currentQuestionType = roomStream.question_type;
+                        currentHint = roomStream.hint;
+
+                        if (roomStream.code && roomStream.code.trim()) {
+                            questionCodeContainer.style.display = "block";
+                            highlightCode(
+                                document.getElementById("question-code"),
+                                roomStream.code,
+                            );
+                        } else {
+                            questionCodeContainer.style.display = "none";
+                        }
+
+                        if (roomStream.question_type === "input") {
+                            answerInputArea.style.display = "block";
+                            answerButtonsArea.style.display = "none";
+                            answerInput.disabled = false;
+                            submitAnswerBtn.disabled = false;
+                            answerInput.focus();
+                        } else if (
+                            roomStream.question_type === "select" ||
+                            roomStream.question_type === "multiselect"
+                        ) {
+                            answerInputArea.style.display = "none";
+                            answerButtonsArea.style.display = "block";
+                            if (
+                                questionChanged &&
+                                roomStream.hint &&
+                                roomStream.hint.length > 0
+                            ) {
+                                createAnswerButtons(
+                                    roomStream.hint,
+                                    roomStream.question_type,
+                                );
+                            }
+                        }
+                    } else {
+                        questionTextEl.innerText = "⏳ Ожидание вопроса...";
+                        answerInputArea.style.display = "none";
+                        answerButtonsArea.style.display = "none";
+                        questionCodeContainer.style.display = "none";
+                        currentQuestionIndex = null;
+                        currentQuestionType = null;
+                    }
+
+                    if (
+                        roomStream.question_title &&
+                        roomStream.question_title !== "<default>"
+                    ) {
+                        questionTitleTextEl.innerText =
+                            roomStream.question_title;
+                        questionTitleEl.style.display = "block";
+                    } else {
+                        questionTitleEl.style.display = "none";
+                    }
+
+                    if (roomStream.image) {
+                        questionImageEl.src = `data:image/png;base64,${roomStream.image}`;
+                        questionImageContainer.style.display = "block";
+                    } else {
+                        questionImageContainer.style.display = "none";
+                    }
+
+                    if (roomStream.users) {
+                        updateUsersList(roomStream.users);
+                    }
+
+                    if (roomStream.teams && roomStream.teams.length > 0) {
+                        updateTeamsList(roomStream.teams);
+                        teamsSection.style.display = "block";
+                    } else {
+                        teamsSection.style.display = "none";
+                    }
+                }
+
+                function updateUsersList(users) {
+                    roomUsersEl.innerHTML = "";
+
+                    if (!users || users.length === 0) {
+                        const row = roomUsersEl.insertRow();
+                        const cell = row.insertCell(0);
+                        cell.colSpan = 4;
+                        cell.innerText = "👻 Нет игроков";
+                        cell.style.textAlign = "center";
+                        cell.style.padding = "20px";
+                        return;
+                    }
+
+                    const sortedUsers = [...users].sort(
+                        (a, b) => b.score - a.score,
+                    );
+
+                    for (const user of sortedUsers) {
+                        const row = roomUsersEl.insertRow();
+
+                        if (user.connection === "disconnected")
+                            row.classList.add("user-disconnected");
+                        if (user.connection === "banned")
+                            row.classList.add("user-banned");
+
+                        const nameCell = row.insertCell(0);
+                        let statusIcon = "";
+                        if (user.connection === "connected") statusIcon = "🟢 ";
+                        else if (user.connection === "disconnected")
+                            statusIcon = "🟡 ";
+                        else if (user.connection === "banned")
+                            statusIcon = "🔴 ";
+                        nameCell.innerHTML = `${statusIcon}${user.nickname || user.username}`;
+
+                        row.insertCell(1).innerText = user.score;
+                        row.insertCell(2).innerText = user.answers_streak || 0;
+
+                        const actionsCell = row.insertCell(3);
+                        if (
+                            (currentUserRole === "moderator" ||
+                                currentUserRole === "administrator") &&
+                            user.username !== currentUsername
+                        ) {
+                            if (user.connection === "banned") {
+                                const unbanBtn =
+                                    document.createElement("button");
+                                unbanBtn.textContent = "🔓";
+                                unbanBtn.className = "success";
+                                unbanBtn.style.padding = "2px 6px";
+                                unbanBtn.style.fontSize = "11px";
+                                unbanBtn.title = "Разбанить";
+                                unbanBtn.onclick = (e) => {
+                                    e.stopPropagation();
+                                    unbanUser(user.username);
+                                };
+                                actionsCell.appendChild(unbanBtn);
+                            } else {
+                                const banBtn = document.createElement("button");
+                                banBtn.textContent = "🔨";
+                                banBtn.className = "danger";
+                                banBtn.style.padding = "2px 6px";
+                                banBtn.style.fontSize = "11px";
+                                banBtn.title = "Забанить";
+                                banBtn.onclick = (e) => {
+                                    e.stopPropagation();
+                                    banUser(user.username);
+                                };
+                                actionsCell.appendChild(banBtn);
+                            }
+                        }
+                    }
+                }
+
+                function updateTeamsList(teams) {
+                    roomTeamsEl.innerHTML = "";
+
+                    for (const team of teams) {
+                        const teamDiv = document.createElement("div");
+                        teamDiv.className = "team-item";
+                        teamDiv.style.borderLeftColor = team.color || "#64748b";
+
+                        const teamHeader = document.createElement("div");
+                        teamHeader.style.display = "flex";
+                        teamHeader.style.justifyContent = "space-between";
+                        teamHeader.style.marginBottom = "5px";
+
+                        const teamName = document.createElement("strong");
+                        teamName.innerText = team.title || "Без названия";
+                        teamName.style.color = team.color || "#64748b";
+
+                        const teamScore = document.createElement("span");
+                        teamScore.innerText = `⭐ ${team.score || 0}`;
+
+                        teamHeader.appendChild(teamName);
+                        teamHeader.appendChild(teamScore);
+                        teamDiv.appendChild(teamHeader);
+
+                        const usersList = document.createElement("div");
+                        usersList.style.fontSize = "11px";
+                        usersList.style.color = "var(--secondary)";
+                        const userNames = team.users
+                            ? team.users
+                                  .map((u) => u.nickname || u.username)
+                                  .join(", ")
+                            : "Нет участников";
+                        usersList.innerText = userNames;
+                        teamDiv.appendChild(usersList);
+
+                        roomTeamsEl.appendChild(teamDiv);
+                    }
+                }
+
+                loadProfile();
+            })();
+        </script>
+    </body>
 </html>

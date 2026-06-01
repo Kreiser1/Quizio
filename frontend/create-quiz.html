@@ -1,373 +1,845 @@
 <!doctype html>
 <html lang="en">
-	<head>
-		<meta charset="UTF-8" />
-		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-		<title>Quizio - Создание викторины</title>
-	</head>
-	<link rel="stylesheet" href="style.css" />
-	<script src="utils.js"></script>
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Quizio - Создание викторины</title>
+    </head>
+    <link rel="stylesheet" href="theme.css" />
+    <script src="utils.js"></script>
 
-	<body>
-		<section class="nav glass">
-			<h1><a href="/">Quizio</a></h1>
-		</section>
-		<section class="profile glass">
-			<img id="profile-avatar" style="width: 64px; height: 64px" />
-			<a id="profile-name" href="/profile.html" style="margin-left: 10px;"></a>
-		</section>
-		<section
-			class="main glass"
-			style="
-				display: flex;
-				flex-direction: column;
-				gap: 10px;
-				overflow-y: auto;
-				max-height: 80vh;
-			"
-		>
-			<label>
-				<h2>Создание викторины</h2>
-			</label>
-			<input
-				type="text"
-				id="quiz-title"
-				placeholder="Название викторины"
-				required
-				minlength="3"
-				maxlength="128"
-			/>
-			<div style="display: flex; flex-direction: column; gap: 5px">
-				<label for="quiz-icon-file">Иконка викторины</label>
-				<input type="file" id="quiz-icon-file" accept="image/*" />
-				<label style="font-size: 12px; color: #888">
-					Рекомендуется загрузить собственную иконку. Если иконка не
-					загружена, будет использована иконка по умолчанию.
-				</label>
-				<div id="icon-preview" style="display: none; margin-top: 5px">
-					<label style="font-size: 12px">Предпросмотр:</label>
-					<img
-						id="icon-preview-img"
-						style="width: 64px; height: 64px; margin-top: 5px"
-					/>
-				</div>
-			</div>
-			<div style="display: flex; flex-direction: column; gap: 5px">
-				<label for="quiz-tags">Теги (через запятую)</label>
-				<input
-					type="text"
-					id="quiz-tags"
-					placeholder="#тег1, #тег2, #тег3"
-				/>
-				<label style="font-size: 12px; color: #888">
-					Теги должны начинаться с # и могут содержать буквы, цифры и
-					подчеркивания.
-				</label>
-			</div>
-			<div
-				style="
-					display: flex;
-					flex-direction: column;
-					gap: 5px;
-					flex-shrink: 0;
-				"
-			>
-				<label for="quiz-questions">Вопросы (YAML формат)</label>
-				<textarea
-					id="quiz-questions"
-					placeholder="Введите вопросы в формате YAML..."
-					style="
-						min-height: 300px;
-						min-width: 300px;
-						font-family: monospace;
-						resize: both;
-					"
-					rows="15"
-				></textarea>
-				<label style="font-size: 12px; color: #888">
-					Пример формата:
-					<pre>
-- score: 10
-text: "Вопрос."
-type: select
-answer: 5
-title: "Заголовок вопроса"
-image: "Base64"
-code: "<Код>"
-time: 30</pre
-					>
-				</label>
-				<label style="color: red" id="questions-error"></label>
-			</div>
-			<span style="display: flex; gap: 10px; flex-shrink: 0">
-				<button id="create-quiz-btn" class="success">
-					Создать викторину
-				</button>
-				<button id="cancel-btn" class="primary">Отмена</button>
-			</span>
-			<hr />
-			<label style="color: red" id="error"></label>
-			<label style="color: green" id="success"></label>
-			<script>
-				document.addEventListener("DOMContentLoaded", function () {
-					load_profile();
+    <body>
+        <section class="nav glass">
+            <h1>Quizio</h1>
+            <a href="/"><h4>🏠 Главная</h4></a>
+            <a href="/profile.html"><h4>👤 Профиль</h4></a>
+            <a href="/achievements.html"><h4>🏆 Достижения</h4></a>
+            <a href="/quizzes.html"><h4>📚 Викторины</h4></a>
+            <a href="/admin.html" id="admin-btn" style="display: none;"><h4>👑 Администрирование</h4></a>
+        </section>
 
-					const createQuizBtn =
-						document.getElementById("create-quiz-btn");
-					const cancelBtn = document.getElementById("cancel-btn");
-					const quizTitle = document.getElementById("quiz-title");
-					const quizIconFile =
-						document.getElementById("quiz-icon-file");
-					const quizTags = document.getElementById("quiz-tags");
-					const quizQuestions =
-						document.getElementById("quiz-questions");
-					const error_msg = document.getElementById("error");
-					const success_msg = document.getElementById("success");
-					const questionsError =
-						document.getElementById("questions-error");
-					const iconPreview = document.getElementById("icon-preview");
-					const iconPreviewImg =
-						document.getElementById("icon-preview-img");
+        <section class="profile glass">
+            <a href="/profile.html"
+                ><img id="profile-avatar" class="small-picture"
+            /></a>
+            <h3 id="profile-name" style="margin-left: 10px"></h3>
+        </section>
 
-					// Create quiz button click
-					if (createQuizBtn) {
-						createQuizBtn.addEventListener("click", createQuiz);
-					}
+        <section
+            class="main glass"
+            style="display: flex; flex-direction: column; gap: 15px"
+        >
+            <h3 id="form-title">📝 Создание викторины</h3>
 
-					// Cancel button click
-					if (cancelBtn) {
-						cancelBtn.addEventListener("click", function () {
-							window.location.href = "/";
-						});
-					}
+            <div style="display: flex; flex-direction: column; gap: 5px">
+                <label for="quiz-title">📖 Название викторины</label>
+                <input
+                    type="text"
+                    id="quiz-title"
+                    placeholder="Введите название викторины..."
+                    required
+                />
+            </div>
 
-					// Icon file preview
-					if (quizIconFile) {
-						quizIconFile.addEventListener("change", function () {
-							const file = this.files[0];
-							if (file) {
-								const reader = new FileReader();
-								reader.onload = function (e) {
-									iconPreviewImg.src = e.target.result;
-									iconPreview.style.display = "block";
-								};
-								reader.readAsDataURL(file);
-							} else {
-								iconPreview.style.display = "none";
-							}
-						});
-					}
+            <div style="display: flex; flex-direction: column; gap: 5px">
+                <label for="quiz-icon-file">🖼️ Иконка викторины</label>
+                <input type="file" id="quiz-icon-file" accept="image/*" />
+                <label style="font-size: 12px; color: var(--secondary)">
+                    Рекомендуется загрузить собственную иконку. Если иконка не
+                    загружена, будет использована иконка по умолчанию.
+                </label>
+                <div id="icon-preview" style="display: none; margin-top: 10px">
+                    <label style="font-size: 12px">Предпросмотр:</label>
+                    <img
+                        id="icon-preview-img"
+                        class="small-picture"
+                        style="display: block; margin-top: 5px"
+                    />
+                </div>
+            </div>
 
-					// Focus on title by default
-					if (quizTitle) {
-						quizTitle.focus();
-					}
+            <div style="display: flex; flex-direction: column; gap: 5px">
+                <label for="quiz-tags">🏷️ Теги (через запятую)</label>
+                <input
+                    type="text"
+                    id="quiz-tags"
+                    placeholder="#тег1, #тег2, #тег3"
+                />
+                <label style="font-size: 12px; color: var(--secondary)">
+                    Теги должны начинаться с # и могут содержать буквы, цифры и
+                    подчеркивания.
+                </label>
+            </div>
 
-					function createQuiz() {
-						error_msg.innerText = "";
-						success_msg.innerText = "";
-						questionsError.innerText = "";
+            <div style="display: flex; gap: 10px; margin: 10px 0">
+                <button id="yaml-mode-btn" class="primary">
+                    📄 YAML-редактор
+                </button>
+                <button id="visual-mode-btn" class="outline">
+                    🎨 Визуальный конструктор
+                </button>
+            </div>
 
-						const title = quizTitle.value.trim();
-						const iconFile = quizIconFile.files[0];
-						const tagsString = quizTags.value.trim();
-						const questionsString = quizQuestions.value.trim();
+            <div
+                id="yaml-editor"
+                style="display: flex; flex-direction: column; gap: 5px"
+            >
+                <label for="quiz-questions">📋 Вопросы (YAML)</label>
+                <textarea
+                    id="quiz-questions"
+                    placeholder='questions:
+  - score: 500
+    text: "Что выведет программа?"
+    type: select
+    answer: 5
+    title: "Вопрос 1"
+    code: "print(\"5\")"
+    hint: [1, 2, 3, 4, 5]
+    time: 90'
+                    style="
+                        min-height: 400px;
+                        font-family: monospace;
+                        resize: vertical;
+                    "
+                    rows="15"
+                ></textarea>
+                <label style="font-size: 12px; color: var(--secondary)">
+                    💡 YAML будет отправлен как есть. Формат должен
+                    соответствовать схеме API.
+                </label>
+            </div>
 
-						// Validate title
-						if (!title) {
-							error_msg.innerText = "Введите название викторины";
-							quizTitle.focus();
-							return;
-						}
+            <div
+                id="visual-editor"
+                style="
+                    display: none;
+                    flex-direction: column;
+                    gap: 15px;
+                    width: 100%;
+                "
+            >
+                <div
+                    style="
+                        display: flex;
+                        justify-content: space-between;
+                        align-items: center;
+                    "
+                >
+                    <h4>🎯 Вопросы</h4>
+                    <button id="add-question-btn" class="success">
+                        Добавить
+                    </button>
+                </div>
+                <div
+                    id="questions-list"
+                    style="
+                        display: flex;
+                        flex-direction: column;
+                        gap: 15px;
+                        max-height: 500px;
+                        overflow-y: auto;
+                        padding-right: 5px;
+                    "
+                ></div>
+            </div>
 
-						if (title.length < 3 || title.length > 128) {
-							error_msg.innerText =
-								"Название викторины должно быть от 3 до 128 символов";
-							quizTitle.focus();
-							return;
-						}
+            <span style="display: flex; gap: 10px">
+                <button id="create-quiz-btn" class="success">
+                    ✨ Создать викторину
+                </button>
+                <button id="cancel-btn" class="primary">❌ Отмена</button>
+            </span>
 
-						// Parse and validate tags
-						let tags = null;
-						if (tagsString) {
-							tags = tagsString
-								.split(",")
-								.map((tag) => tag.trim())
-								.filter((tag) => tag);
+            <hr />
 
-							// Validate tag format
-							const tagRegex = /^#\w+(?:_\w+)*$/;
-							for (const tag of tags) {
-								if (!tagRegex.test(tag)) {
-									error_msg.innerText = `Неверный формат тега: ${tag}`;
-									quizTags.focus();
-									return;
-								}
-							}
+            <p id="error" style="color: crimson; display: none"></p>
+            <p id="success" style="color: #10b981; display: none"></p>
+        </section>
 
-							if (tags.length === 0) {
-								tags = null;
-							}
-						}
+        <section class="side glass scroll" style="width: 100%">
+            <h4>📖 Помощь</h4>
+            <div style="padding: 15px; font-size: 16px">
+                <div style="margin-bottom: 15px">
+                    <strong>📝 Типы вопросов:</strong><br />
+                    • <code>select</code> - выбор одного варианта (answer:
+                    число)<br />
+                    • <code>multiselect</code> - выбор нескольких (answer: [2,
+                    3, 5])<br />
+                    • <code>input</code> - текстовый ответ (answer: "строка")
+                </div>
+                <div style="margin-bottom: 15px">
+                    <strong>💡 Подсказка (hint):</strong><br />
+                    Массив чисел, которые будут показаны как кнопки для
+                    выбора.<br />
+                    Например, если answer: 5, hint: [3, 4, 5, 9] - игроку будут
+                    показаны кнопки 3, 4, 5, 9.
+                </div>
+            </div>
+        </section>
 
-						// If there's an icon file, convert to base64 and create quiz
-						if (iconFile) {
-							const reader = new FileReader();
-							reader.onload = function (e) {
-								const base64 = e.target.result.split(",")[1];
-								createEmptyQuiz(
-									title,
-									base64,
-									tags,
-									questionsString,
-								);
-							};
-							reader.onerror = function () {
-								error_msg.innerText =
-									"Ошибка чтения файла иконки";
-							};
-							reader.readAsDataURL(iconFile);
-						} else {
-							// No icon uploaded, use default (1)
-							createEmptyQuiz(title, 1, tags, questionsString);
-						}
-					}
+        <script>
+            let currentUserRole = "user";
+            let currentUsername = "";
+            let currentQuizId = null;
+            let questions = [];
+            let isVisualMode = false;
 
-					function createEmptyQuiz(
-						title,
-						icon,
-						tags,
-						questionsString,
-					) {
-						const createQuizBtn =
-							document.getElementById("create-quiz-btn");
-						const error_msg = document.getElementById("error");
-						const success_msg = document.getElementById("success");
+            function getImageUrl(icon) {
+                if (typeof icon === "number") {
+                    return load_preset(`${icon}.png`);
+                } else if (typeof icon === "string" && icon.length > 0) {
+                    return `data:image/png;base64,${icon}`;
+                }
+                return null;
+            }
 
-						// Disable button during request
-						createQuizBtn.disabled = true;
-						createQuizBtn.innerText = "Создание...";
+            function getRoleColor(role) {
+                return role === "administrator"
+                    ? "crimson"
+                    : role === "moderator"
+                      ? "yellow"
+                      : "greenyellow";
+            }
 
-						// Create empty quiz first
-						const emptyQuestions = [
-							{
-								score: 0,
-								text: "Временный вопрос",
-								type: "select",
-								answer: 0,
-							},
-						];
+            function showMessage(element, message, isError = true) {
+                if (!element) return;
+                element.textContent = message;
+                element.style.display = "block";
 
-						const payload = {
-							title: title,
-							icon: icon,
-							questions: emptyQuestions,
-						};
+                if (!isError) {
+                    setTimeout(() => {
+                        if (element.textContent === message) {
+                            element.style.opacity = "0.5";
+                            setTimeout(() => {
+                                if (element.textContent === message) {
+                                    element.style.display = "none";
+                                    element.style.opacity = "";
+                                }
+                            }, 2000);
+                        }
+                    }, 3000);
+                }
+            }
 
-						if (tags) {
-							payload.tags = tags;
-						}
+            function hideMessages() {
+                document.getElementById("error").style.display = "none";
+                document.getElementById("success").style.display = "none";
+            }
 
-						request_json(
-							"/quizzes",
-							"POST",
-							payload,
-							(response) => {
-								const quizId = response.id;
+            function loadYamlContent(quizId, onSuccess, onError) {
+                fetch(`/api/quizzes/${quizId}/yaml`, {
+                    method: "GET",
+                    credentials: "include",
+                })
+                    .then((response) => {
+                        if (!response.ok) {
+                            throw new Error(
+                                `${response.status} ${response.statusText}`,
+                            );
+                        }
+                        return response.text();
+                    })
+                    .then((yamlText) => {
+                        if (onSuccess) onSuccess(yamlText);
+                    })
+                    .catch((error) => {
+                        console.error("Failed to load YAML:", error);
+                        if (onError) onError(error);
+                    });
+            }
 
-								// If there are questions, update the quiz with YAML
-								if (questionsString && questionsString.trim()) {
-									updateQuizWithYaml(quizId, questionsString);
-								} else {
-									success_msg.innerText =
-										"Викторина успешно создана!";
-									createQuizBtn.disabled = false;
-									createQuizBtn.innerText =
-										"Создать викторину";
-									clearForm();
-									document.querySelector(".main").scrollTop =
-										0;
-								}
-							},
-							(error) => {
-								error_msg.innerText = error;
-								createQuizBtn.disabled = false;
-								createQuizBtn.innerText = "Создать викторину";
-							},
-						);
-					}
+            function loadProfile() {
+                UsersAPI.get_profile(
+                    (profile) => {
+                        currentUsername = profile.username;
+                        currentUserRole = profile.role;
 
-					function updateQuizWithYaml(quizId, yamlString) {
-						const error_msg = document.getElementById("error");
-						const success_msg = document.getElementById("success");
-						const createQuizBtn =
-							document.getElementById("create-quiz-btn");
+                        const nameElement =
+                            document.getElementById("profile-name");
+                        nameElement.textContent =
+                            profile.nickname || profile.username;
+                        nameElement.style.color = getRoleColor(profile.role);
 
-						createQuizBtn.innerText = "Обновление вопросов...";
+                        const avatarUrl = getImageUrl(profile.avatar);
+                        const avatarElement =
+                            document.getElementById("profile-avatar");
+                        if (avatarUrl) {
+                            avatarElement.src = avatarUrl;
+                            avatarElement.onerror = () =>
+                                (avatarElement.style.display = "none");
+                        } else {
+                            avatarElement.style.display = "none";
+                        }
 
-						request_json(
-							`/quizzes/${quizId}`,
-							"PATCH",
-							yamlString, // Send YAML string directly
-							(response) => {
-								success_msg.innerText =
-									"Викторина успешно создана с вопросами!";
-								createQuizBtn.disabled = false;
-								createQuizBtn.innerText = "Создать викторину";
-								clearForm();
-								document.querySelector(".main").scrollTop = 0;
-							},
-							(error) => {
-								error_msg.innerText = `Викторина создана, но не удалось обновить вопросы: ${error}`;
-								createQuizBtn.disabled = false;
-								createQuizBtn.innerText = "Создать викторину";
-							},
-						);
-					}
+						const adminBtn = document.getElementById("admin-btn");
+                        if (adminBtn) {
+                            adminBtn.style.display = (currentUserRole === "administrator") ? "block" : "none";
+                        }
 
-					function clearForm() {
-						document.getElementById("quiz-title").value = "";
-						document.getElementById("quiz-questions").value = "";
-						document.getElementById("quiz-tags").value = "";
-						document.getElementById("quiz-icon-file").value = "";
-						document.getElementById("icon-preview").style.display =
-							"none";
-					}
-				});
+                        const urlParams = new URLSearchParams(
+                            window.location.search,
+                        );
+                        const quizId = urlParams.get("quiz_id");
+                        if (quizId) {
+                            currentQuizId = parseInt(quizId);
+                            document.getElementById("form-title").innerHTML =
+                                "✏️ Редактирование викторины";
+                            document.getElementById(
+                                "create-quiz-btn",
+                            ).innerHTML = "💾 Сохранить изменения";
+                            loadQuizData(currentQuizId);
+                        }
+                    },
+                    (error) => {
+                        console.error("Failed to load profile:", error);
+                        if (
+                            error.message.includes("401") ||
+                            error.message.includes("403")
+                        ) {
+                            redirect("/login.html");
+                        }
+                    },
+                );
+            }
 
-				function load_profile() {
-					const profile_name =
-						document.getElementById("profile-name");
+            function loadQuizData(quizId) {
+                QuizzesAPI.get(
+                    quizId,
+                    (quiz) => {
+                        document.getElementById("quiz-title").value =
+                            quiz.title;
 
-					request_json(
-						"/users/me",
-						"GET",
-						null,
-						(response) => {
-							document.getElementById("profile-name").innerText =
-								response.full_name ?? response.username;
+                        if (quiz.tags && quiz.tags.length > 0) {
+                            document.getElementById("quiz-tags").value =
+                                quiz.tags.join(", ");
+                        }
 
-							if (response.role == "administrator") {
-								profile_name.style.color = "red";
-							} else if (response.role == "moderator") {
-								profile_name.style.color = "yellow";
-							}
+                        if (quiz.icon) {
+                            const iconUrl = getImageUrl(quiz.icon);
+                            if (iconUrl) {
+                                const iconPreview =
+                                    document.getElementById("icon-preview");
+                                const iconPreviewImg =
+                                    document.getElementById("icon-preview-img");
+                                iconPreviewImg.src = iconUrl;
+                                iconPreview.style.display = "block";
+                            }
+                        }
 
-							if (typeof response.avatar == "number") {
-								document.getElementById("profile-avatar").src =
-									load_preset(response.avatar);
-							} else if (typeof response.avatar == "string") {
-								document.getElementById("profile-avatar").src =
-									"data:image/png;base64," + response.avatar;
-							} else {
-								document.getElementById("profile-avatar").src =
-									load_preset(1);
-							}
-						},
-						(error) => redirect("/login.html"),
-					);
-				}
-			</script>
-		</section>
-	</body>
+                        questions = quiz.questions;
+                        renderQuestionsList();
+
+                        loadYamlContent(
+                            quizId,
+                            (yamlText) => {
+                                document.getElementById(
+                                    "quiz-questions",
+                                ).value = yamlText;
+                            },
+                            (error) => {
+                                console.error("Failed to load YAML:", error);
+
+                                const fallbackYaml = questionsToYaml(questions);
+                                document.getElementById(
+                                    "quiz-questions",
+                                ).value = fallbackYaml;
+                                showMessage(
+                                    document.getElementById("error"),
+                                    "⚠️ Не удалось загрузить YAML, используется автоматическая генерация",
+                                );
+                            },
+                        );
+                    },
+                    (error) => {
+                        console.error("Failed to load quiz:", error);
+                        showMessage(
+                            document.getElementById("error"),
+                            "❌ Не удалось загрузить данные викторины",
+                        );
+                    },
+                );
+            }
+
+            function questionsToYaml(questions) {
+                const yamlLines = ["questions:"];
+                questions.forEach((q) => {
+                    yamlLines.push("  - score: " + q.score);
+                    yamlLines.push(
+                        '    text: "' + q.text.replace(/"/g, '\\"') + '"',
+                    );
+                    yamlLines.push("    type: " + q.type);
+
+                    if (q.type === "select") {
+                        yamlLines.push("    answer: " + q.answer);
+                    } else if (q.type === "multiselect") {
+                        yamlLines.push(
+                            "    answer: " + JSON.stringify(q.answer),
+                        );
+                    } else if (q.type === "input") {
+                        yamlLines.push(
+                            '    answer: "' +
+                                q.answer.replace(/"/g, '\\"') +
+                                '"',
+                        );
+                    }
+
+                    yamlLines.push(
+                        '    title: "' +
+                            (q.title || "").replace(/"/g, '\\"') +
+                            '"',
+                    );
+
+                    if (q.image) yamlLines.push('    image: "' + q.image + '"');
+                    if (q.code)
+                        yamlLines.push(
+                            '    code: "' + q.code.replace(/"/g, '\\"') + '"',
+                        );
+                    if (q.hint && q.hint.length > 0)
+                        yamlLines.push("    hint: " + JSON.stringify(q.hint));
+                    if (q.time) yamlLines.push("    time: " + q.time);
+                });
+                return yamlLines.join("\n");
+            }
+
+            function formatHint(hint) {
+                if (!hint || hint.length === 0) return "Не указана";
+                return hint.join(", ");
+            }
+
+            function formatAnswer(answer, type) {
+                if (type === "select") return answer;
+                if (type === "multiselect") return answer.join(", ");
+                return `"${answer}"`;
+            }
+
+            function renderQuestionsList() {
+                const container = document.getElementById("questions-list");
+                container.innerHTML = "";
+
+                if (questions.length === 0) {
+                    container.innerHTML =
+                        '<div style="text-align: center; padding: 40px; color: var(--secondary);">📭 Нет вопросов. Нажмите "Добавить вопрос"</div>';
+                    return;
+                }
+
+                questions.forEach((q, index) => {
+                    const questionDiv = document.createElement("div");
+                    questionDiv.style.cssText =
+                        "border: 1px solid var(--border-color); border-radius: var(--border-radius); padding: 15px; background: var(--card-bg);";
+
+                    questionDiv.innerHTML = `
+                        <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 10px;">
+                            <strong>Вопрос ${index + 1}: ${q.title || "Без названия"}</strong>
+                            <div style="display: flex; gap: 5px;">
+                                <button class="move-up-btn" ${index === 0 ? "disabled" : ""} style="padding: 5px 10px;">⬆️</button>
+                                <button class="move-down-btn" ${index === questions.length - 1 ? "disabled" : ""} style="padding: 5px 10px;">⬇️</button>
+                                <button class="edit-question-btn" style="padding: 5px 10px;">✏️</button>
+                                <button class="delete-question-btn" style="padding: 5px 10px; background: var(--gradient-danger);">🗑️</button>
+                            </div>
+                        </div>
+                        <div style="font-size: 12px; color: var(--secondary);">
+                            <div>📝 Тип: ${q.type} | ⭐ Баллов: ${q.score} | ⏱️ Время: ${q.time || "∞"}с</div>
+                            ${q.type !== "input" ? `<div>💡 Кнопки: ${formatHint(q.hint)}</div>` : ""}
+                            <div>✅ Ответ: ${formatAnswer(q.answer, q.type)}</div>
+                            <div style="margin-top: 5px;">📖 Текст: ${q.text.substring(0, 100)}${q.text.length > 100 ? "..." : ""}</div>
+                            ${q.code ? `<div>💻 Код: ${q.code.substring(0, 50)}${q.code.length > 50 ? "..." : ""}</div>` : ""}
+                        </div>
+                    `;
+
+                    questionDiv.querySelector(".move-up-btn").onclick = () =>
+                        moveQuestion(index, -1);
+                    questionDiv.querySelector(".move-down-btn").onclick = () =>
+                        moveQuestion(index, 1);
+                    questionDiv.querySelector(".edit-question-btn").onclick =
+                        () => editQuestion(index);
+                    questionDiv.querySelector(".delete-question-btn").onclick =
+                        () => deleteQuestion(index);
+
+                    container.appendChild(questionDiv);
+                });
+            }
+
+            function moveQuestion(from, direction) {
+                const to = from + direction;
+                if (to < 0 || to >= questions.length) return;
+                [questions[from], questions[to]] = [
+                    questions[to],
+                    questions[from],
+                ];
+                renderQuestionsList();
+            }
+
+            function deleteQuestion(index) {
+                if (
+                    confirm(
+                        `Удалить вопрос "${questions[index].title || index + 1}"?`,
+                    )
+                ) {
+                    questions.splice(index, 1);
+                    renderQuestionsList();
+                }
+            }
+
+            function editQuestion(index) {
+                const q = questions[index];
+
+                const newTitle = prompt("Название вопроса:", q.title);
+                if (newTitle !== null) q.title = newTitle;
+
+                const newText = prompt("Текст вопроса:", q.text);
+                if (newText !== null) q.text = newText;
+
+                const newScore = parseInt(
+                    prompt("Количество баллов:", q.score),
+                );
+                if (!isNaN(newScore)) q.score = newScore;
+
+                const newType = prompt(
+                    "Тип вопроса (select/multiselect/input):",
+                    q.type,
+                );
+                if (
+                    newType &&
+                    ["select", "multiselect", "input"].includes(newType)
+                ) {
+                    q.type = newType;
+                    if (newType === "input") {
+                        q.answer = "";
+                        q.hint = null;
+                    } else {
+                        if (newType === "select") q.answer = 0;
+                        else q.answer = [];
+                        q.hint = [];
+                    }
+                }
+
+                const newTime = parseInt(
+                    prompt(
+                        "Время в секундах (0 - без ограничения):",
+                        q.time || 0,
+                    ),
+                );
+                if (!isNaN(newTime)) q.time = newTime || null;
+
+                const newCode = prompt("Код (опционально):", q.code || "");
+                if (newCode !== null) q.code = newCode || null;
+
+                if (q.type === "select") {
+                    const newAnswer = parseInt(
+                        prompt("Правильный ответ (число):", q.answer),
+                    );
+                    if (!isNaN(newAnswer)) q.answer = newAnswer;
+                } else if (q.type === "multiselect") {
+                    const newAnswer = prompt(
+                        "Правильные ответы (числа через запятую, например: 2,3,5):",
+                        q.answer.join(", "),
+                    );
+                    if (newAnswer) {
+                        q.answer = newAnswer
+                            .split(",")
+                            .map((i) => parseInt(i.trim()))
+                            .filter((i) => !isNaN(i));
+                    }
+                } else if (q.type === "input") {
+                    const newAnswer = prompt(
+                        "Правильный ответ (текст):",
+                        q.answer,
+                    );
+                    if (newAnswer !== null) q.answer = newAnswer;
+                }
+
+                if (q.type === "select" || q.type === "multiselect") {
+                    const hintStr = prompt(
+                        "Кнопки для выбора (числа через запятую, например: 1,2,3,4,5):",
+                        q.hint ? q.hint.join(", ") : "",
+                    );
+                    if (hintStr !== null && hintStr.trim()) {
+                        q.hint = hintStr
+                            .split(",")
+                            .map((i) => parseInt(i.trim()))
+                            .filter((i) => !isNaN(i));
+                    } else {
+                        q.hint = [];
+                    }
+                }
+
+                renderQuestionsList();
+            }
+
+            function addQuestion() {
+                const newQuestion = {
+                    score: 10,
+                    text: "Новый вопрос",
+                    type: "select",
+                    answer: 0,
+                    title: `Вопрос ${questions.length + 1}`,
+                    hint: [0, 1, 2, 3, 4],
+                    time: 30,
+                    code: null,
+                };
+                questions.push(newQuestion);
+                renderQuestionsList();
+                setTimeout(() => editQuestion(questions.length - 1), 100);
+            }
+
+            function saveQuiz() {
+                hideMessages();
+
+                const title = document
+                    .getElementById("quiz-title")
+                    .value.trim();
+                const iconFile =
+                    document.getElementById("quiz-icon-file").files[0];
+                const tagsString = document
+                    .getElementById("quiz-tags")
+                    .value.trim();
+
+                if (!title) {
+                    showMessage(
+                        document.getElementById("error"),
+                        "❌ Введите название викторины",
+                    );
+                    document.getElementById("quiz-title").focus();
+                    return;
+                }
+
+                if (title.length < 3) {
+                    showMessage(
+                        document.getElementById("error"),
+                        "❌ Название должно содержать минимум 3 символа",
+                    );
+                    document.getElementById("quiz-title").focus();
+                    return;
+                }
+
+                let tags = null;
+                if (tagsString) {
+                    tags = tagsString
+                        .split(",")
+                        .map((tag) => tag.trim())
+                        .filter((tag) => tag);
+                    const tagRegex = /^#\w+(?:_\w+)*$/;
+                    for (const tag of tags) {
+                        if (!tagRegex.test(tag)) {
+                            showMessage(
+                                document.getElementById("error"),
+                                `❌ Неверный формат тега: ${tag}`,
+                            );
+                            return;
+                        }
+                    }
+                    if (tags.length === 0) tags = null;
+                }
+
+                const createBtn = document.getElementById("create-quiz-btn");
+                createBtn.disabled = true;
+                createBtn.textContent = "⏳ Сохранение...";
+
+                const saveQuizData = async (icon) => {
+                    let questionsData;
+
+                    if (isVisualMode) {
+                        if (questions.length === 0) {
+                            showMessage(
+                                document.getElementById("error"),
+                                "❌ Добавьте хотя бы один вопрос",
+                            );
+                            createBtn.disabled = false;
+                            createBtn.textContent = currentQuizId
+                                ? "💾 Сохранить изменения"
+                                : "✨ Создать викторину";
+                            return;
+                        }
+                        questionsData = questions;
+                    } else {
+                        const yamlText = document
+                            .getElementById("quiz-questions")
+                            .value.trim();
+                        if (!yamlText) {
+                            showMessage(
+                                document.getElementById("error"),
+                                "❌ Добавьте хотя бы один вопрос",
+                            );
+                            createBtn.disabled = false;
+                            createBtn.textContent = currentQuizId
+                                ? "💾 Сохранить изменения"
+                                : "✨ Создать викторину";
+                            return;
+                        }
+                        questionsData = yamlText;
+                    }
+
+                    const payload = {
+                        title: title,
+                        icon: icon,
+                        questions: questionsData,
+                    };
+                    if (tags) payload.tags = tags;
+
+                    if (currentQuizId) {
+                        QuizzesAPI.update(
+                            currentQuizId,
+                            payload,
+                            () => {
+                                showMessage(
+                                    document.getElementById("success"),
+                                    "✅ Викторина успешно обновлена!",
+                                    false,
+                                );
+                                setTimeout(
+                                    () => redirect("/quizzes.html"),
+                                    2000,
+                                );
+                            },
+                            (error) => {
+                                console.error("Failed to update quiz:", error);
+                                let errorMessage =
+                                    "❌ Не удалось обновить викторину";
+                                if (
+                                    error.message &&
+                                    error.message.includes("422")
+                                ) {
+                                    if (isVisualMode) {
+                                        errorMessage =
+                                            "❌ Неверный формат данных. Проверьте вопросы.";
+                                    } else {
+                                        errorMessage =
+                                            "❌ Неверный формат YAML. Проверьте синтаксис.";
+                                    }
+                                }
+                                showMessage(
+                                    document.getElementById("error"),
+                                    errorMessage,
+                                );
+                                createBtn.disabled = false;
+                                createBtn.textContent =
+                                    "💾 Сохранить изменения";
+                            },
+                        );
+                    } else {
+                        QuizzesAPI.create(
+                            payload,
+                            () => {
+                                showMessage(
+                                    document.getElementById("success"),
+                                    "✅ Викторина успешно создана!",
+                                    false,
+                                );
+                                setTimeout(
+                                    () => redirect("/quizzes.html"),
+                                    2000,
+                                );
+                            },
+                            (error) => {
+                                console.error("Failed to create quiz:", error);
+                                let errorMessage =
+                                    "❌ Не удалось создать викторину";
+                                if (
+                                    error.message &&
+                                    error.message.includes("422")
+                                ) {
+                                    if (isVisualMode) {
+                                        errorMessage =
+                                            "❌ Неверный формат данных. Проверьте вопросы.";
+                                    } else {
+                                        errorMessage =
+                                            "❌ Неверный формат YAML. Проверьте синтаксис.";
+                                    }
+                                }
+                                showMessage(
+                                    document.getElementById("error"),
+                                    errorMessage,
+                                );
+                                createBtn.disabled = false;
+                                createBtn.textContent = "✨ Создать викторину";
+                            },
+                        );
+                    }
+                };
+
+                if (iconFile) {
+                    file_to_base64(iconFile)
+                        .then((base64) => saveQuizData(base64))
+                        .catch((error) => {
+                            console.error("Failed to convert icon:", error);
+                            showMessage(
+                                document.getElementById("error"),
+                                "❌ Ошибка обработки иконки",
+                            );
+                            createBtn.disabled = false;
+                            createBtn.textContent = currentQuizId
+                                ? "💾 Сохранить изменения"
+                                : "✨ Создать викторину";
+                        });
+                } else {
+                    saveQuizData(1);
+                }
+            }
+
+            function setupModeToggle() {
+                const yamlBtn = document.getElementById("yaml-mode-btn");
+                const visualBtn = document.getElementById("visual-mode-btn");
+                const yamlEditor = document.getElementById("yaml-editor");
+                const visualEditor = document.getElementById("visual-editor");
+
+                yamlBtn.onclick = () => {
+                    isVisualMode = false;
+                    yamlBtn.className = "primary";
+                    visualBtn.className = "outline";
+                    yamlEditor.style.display = "flex";
+                    visualEditor.style.display = "none";
+                };
+
+                visualBtn.onclick = () => {
+                    isVisualMode = true;
+                    visualBtn.className = "primary";
+                    yamlBtn.className = "outline";
+                    yamlEditor.style.display = "none";
+                    visualEditor.style.display = "flex";
+                };
+            }
+
+            function setupEventListeners() {
+                document.getElementById("create-quiz-btn").onclick = saveQuiz;
+                document.getElementById("cancel-btn").onclick = () =>
+                    redirect("/quizzes.html");
+                document.getElementById("add-question-btn").onclick =
+                    addQuestion;
+
+                document.getElementById("quiz-icon-file").onchange =
+                    function () {
+                        const file = this.files[0];
+                        if (file) {
+                            const reader = new FileReader();
+                            reader.onload = (e) => {
+                                document.getElementById(
+                                    "icon-preview-img",
+                                ).src = e.target.result;
+                                document.getElementById(
+                                    "icon-preview",
+                                ).style.display = "block";
+                            };
+                            reader.readAsDataURL(file);
+                        } else {
+                            document.getElementById(
+                                "icon-preview",
+                            ).style.display = "none";
+                        }
+                    };
+
+                setupModeToggle();
+            }
+
+            function init() {
+                loadProfile();
+                setupEventListeners();
+            }
+
+            if (document.readyState === "loading") {
+                document.addEventListener("DOMContentLoaded", init);
+            } else {
+                init();
+            }
+        </script>
+    </body>
 </html>

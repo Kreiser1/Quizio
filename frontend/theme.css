@@ -1,7 +1,17 @@
 @import url("classless.css");
 
 html > body {
-    background: linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%);
+    background:
+        radial-gradient(at 0% 0%, hsla(253, 30%, 15%, 1) 0, transparent 60%),
+        radial-gradient(at 50% 0%, hsla(275, 85%, 28%, 1) 0, transparent 60%),
+        radial-gradient(at 100% 0%, hsla(339, 80%, 28%, 1) 0, transparent 60%),
+        radial-gradient(at 0% 100%, hsla(263, 80%, 22%, 1) 0, transparent 60%),
+        radial-gradient(
+            at 100% 100%,
+            hsla(280, 90%, 18%, 1) 0,
+            transparent 60%
+        ),
+        linear-gradient(135deg, #160e20 0%, #2b134d 100%);
     background-size: cover;
     background-attachment: fixed;
     min-height: 100vh;
@@ -96,14 +106,12 @@ h3,
 h4,
 h5,
 a,
-label {
+label,
+th,
+tr,
+img,
+pre,
+code,
+div {
     user-select: none;
-}
-
-.no-select {
-    user-select: none;
-}
-
-.no-wrap {
-    white-space: nowrap;
 }

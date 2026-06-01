@@ -10,14 +10,26 @@
 
     <body>
         <section class="nav glass">
-            <h1>Quizio</h1>
-            <a href=""><h4>Главная</h4></a>
-            <a href="/profile.html"><h4>Профиль</h4></a>
-            <a href="/achievements.html"><h4>Достижения</h4></a>
+            <h1
+                style="
+                    text-shadow:
+                        0 0 40px #fff,
+                        0 0 80px #fff;
+                "
+            >
+                Quizio
+            </h1>
+            <a href="/"><h4>🏠 Главная</h4></a>
+            <a href="/profile.html"><h4>👤 Профиль</h4></a>
+            <a href="/achievements.html"><h4>🏆 Достижения</h4></a>
+            <a href="/quizzes.html" id="quizzes-btn" style="display: none;"><h4>📚 Викторины</h4></a>
+            <a href="/admin.html" id="admin-btn" style="display: none;"><h4>👑 Администрирование</h4></a>
         </section>
         <section class="profile glass">
-            <a href="/profile.html"><img id="profile-avatar" class="small-picture" /></a>
-            <h4 id="profile-name"></h4>
+            <a href="/profile.html"
+                ><img id="profile-avatar" class="small-picture"
+            /></a>
+            <h3 id="profile-name" style="margin-left: 10px"></h3>
         </section>
         <section
             class="main glass"
@@ -30,7 +42,7 @@
         >
             <div style="overflow-x: auto">
                 <label>
-                    <h4>Комнаты</h4>
+                    <h3>Комнаты</h3>
                 </label>
                 <table style="width: 100%">
                     <thead>
@@ -46,7 +58,7 @@
                     </thead>
                     <tbody id="rooms"></tbody>
                 </table>
-                <p class="no-select" style="color: red" id="rooms-error"></label>
+                <p style="color: crimson" id="rooms-error"></p>
             </div>
             <div
                 style="
@@ -61,20 +73,18 @@
                 <input
                     type="number"
                     min="0"
-                    value=""
                     id="search-count"
                     placeholder="Количество"
                 />
                 <input
                     type="number"
                     min="0"
-                    value=""
                     id="search-offset"
                     placeholder="Страница"
                 />
                 <button
                     id="create-room-btn"
-                    class="success no-wrap"
+                    class="success"
                     style="display: none"
                 >
                     Создать
@@ -85,257 +95,298 @@
             class="side glass scroll"
             style="display: flex; flex-direction: column"
         >
-            <a href="/achievements.html"><h4>Достижения</h4></a>
+            <a href="/achievements.html"><h4>🏆 Достижения</h4></a>
             <table>
                 <tbody id="achievements"></tbody>
             </table>
-            <p class="no-select" style="color: red" id="achievements-error"></p>
+            <p style="color: crimson" id="achievements-error"></p>
         </section>
         <script>
-    // State management
-    let currentProfile = null;
-    let roomsRefreshInterval = null;
-    let achievementsRefreshInterval = null;
+            let currentUserRole = "user";
+            let currentUsername = "";
+            let refreshTimeout = null;
 
-    // Load profile data
-    function loadProfile() {
-        request_json(
-            "/users/me",
-            "GET",
-            null,
-            (profile) => {
-                currentProfile = profile;
-                updateProfileUI(profile);
-                updateCreateRoomButton(profile);
-            },
-            (error) => {
-                console.error("Failed to load profile:", error);
-                // Redirect to login if unauthorized
-                if (error.message.includes("401")) {
-                    redirect("/login.html");
+            function getImageUrl(icon) {
+                if (typeof icon === "number") {
+                    return load_preset(`${icon}.png`);
+                } else if (typeof icon === "string" && icon.length > 0) {
+                    return `data:image/png;base64,${icon}`;
                 }
+                return null;
             }
-        );
-    }
 
-    // Update profile UI elements
-    function updateProfileUI(profile) {
-        const avatarImg = get_element("profile-avatar");
-        const nameElement = get_element("profile-name");
+            function getRoleColor(role) {
+                return role === "administrator"
+                    ? "crimson"
+                    : role === "moderator"
+                      ? "#f59e0b"
+                      : "#10b981";
+            }
 
-        if (avatarImg) {
-            if (typeof profile.avatar === "number" || (typeof profile.avatar === "string" && !profile.avatar.startsWith("data:"))) {
-                // Avatar is a number (0-99) or numeric string
-                const avatarNumber = parseInt(profile.avatar);
-                if (!isNaN(avatarNumber) && avatarNumber >= 0 && avatarNumber <= 99) {
-                    avatarImg.src = load_preset(avatarNumber + ".png");
-                } else {
-                    avatarImg.src = load_preset("0.png");
-                }
-            } else if (typeof profile.avatar === "string" && profile.avatar.startsWith("data:")) {
-                // Avatar is base64
-                avatarImg.src = profile.avatar;
+            function loadProfile() {
+                UsersAPI.get_profile(
+                    (profile) => {
+                        currentUsername = profile.username;
+                        currentUserRole = profile.role;
+
+                        const nameElement =
+                            document.getElementById("profile-name");
+                        nameElement.textContent =
+                            profile.nickname || profile.username;
+                        nameElement.style.color = getRoleColor(profile.role);
+
+                        const avatarUrl = getImageUrl(profile.avatar);
+                        const avatarElement =
+                            document.getElementById("profile-avatar");
+
+                        if (avatarUrl) {
+                            avatarElement.src = avatarUrl;
+                            avatarElement.onerror = () => {
+                                avatarElement.style.display = "none";
+                            };
+                        } else {
+                            avatarElement.style.display = "none";
+                        }
+
+                        const createBtn =
+                            document.getElementById("create-room-btn");
+                        if (
+                            currentUserRole === "moderator" ||
+                            currentUserRole === "administrator"
+                        ) {
+                            createBtn.style.display = "block";
+                        } else {
+                            createBtn.style.display = "none";
+                        }
+
+                        const quizzesBtn =
+                            document.getElementById("quizzes-btn");
+                        if (
+                            currentUserRole === "moderator" ||
+                            currentUserRole === "administrator"
+                        ) {
+                            quizzesBtn.style.display = "block";
+                        } else {
+                            quizzesBtn.style.display = "none";
+                        }
+
+                        const adminBtn = document.getElementById("admin-btn");
+                        if (adminBtn) {
+                            adminBtn.style.display = (currentUserRole === "administrator") ? "block" : "none";
+                        }
+                    },
+                    (error) => {
+                        console.error("Failed to load profile:", error);
+                        if (
+                            error.message.includes("401") ||
+                            error.message.includes("403")
+                        ) {
+                            redirect("/login.html");
+                        }
+                    },
+                );
+            }
+
+            function loadAchievements() {
+                AchievementsAPI.get_my_achievements(
+                    (achievements) => {
+                        const tbody = document.getElementById("achievements");
+                        const errorElement =
+                            document.getElementById("achievements-error");
+
+                        tbody.innerHTML = "";
+                        errorElement.textContent = "";
+
+                        if (achievements.length === 0) {
+                            const row = tbody.insertRow();
+                            const cell = row.insertCell(0);
+                            cell.colSpan = 2;
+                            cell.textContent = "✨ Нет достижений";
+                            cell.style.textAlign = "center";
+                            cell.style.padding = "20px";
+                            cell.className = "no-select";
+                            return;
+                        }
+
+                        achievements.forEach((achievement) => {
+                            const row = tbody.insertRow();
+
+                            const iconCell = row.insertCell(0);
+                            const iconUrl = getImageUrl(achievement.icon);
+                            if (iconUrl) {
+                                const iconImg = document.createElement("img");
+                                iconImg.className = "small-picture";
+                                iconImg.src = iconUrl;
+                                iconImg.onerror = () => {
+                                    iconImg.style.display = "none";
+                                };
+                                iconCell.appendChild(iconImg);
+                            }
+
+                            const titleCell = row.insertCell(1);
+                            titleCell.textContent = achievement.title;
+                            titleCell.style.paddingLeft = "10px";
+                        });
+                    },
+                    (error) => {
+                        console.error("Failed to load achievements:", error);
+                        document.getElementById(
+                            "achievements-error",
+                        ).textContent = "❌ Не удалось загрузить достижения";
+                    },
+                );
+            }
+
+            function loadRooms(query, count, offset) {
+                const tbody = document.getElementById("rooms");
+                const errorElement = document.getElementById("rooms-error");
+
+                tbody.innerHTML =
+                    '<tr><td colspan="7" style="text-align: center;">⏳ Загрузка...</td></tr>';
+                errorElement.textContent = "";
+
+                const params = {
+                    query: query || undefined,
+                    count: parseInt(count) || 25,
+                    offset: parseInt(offset) || 0,
+                };
+
+                RoomsAPI.search(
+                    params,
+                    (rooms) => {
+                        tbody.innerHTML = "";
+
+                        if (rooms.length === 0) {
+                            const row = tbody.insertRow();
+                            const cell = row.insertCell(0);
+                            cell.colSpan = 7;
+                            cell.textContent = "📭 Нет доступных комнат";
+                            cell.style.textAlign = "center";
+                            cell.style.padding = "20px";
+                            return;
+                        }
+
+                        rooms.forEach((room) => {
+                            const row = tbody.insertRow();
+                            row.style.cursor = "pointer";
+                            row.style.transition = "background-color 0.2s";
+
+                            row.onclick = () => {
+                                redirect(`/room.html?token=${room.room_token}`);
+                            };
+
+                            row.onmouseenter = () => {
+                                row.style.backgroundColor =
+                                    "rgba(255, 255, 255, 0.05)";
+                            };
+                            row.onmouseleave = () => {
+                                row.style.backgroundColor = "";
+                            };
+
+                            const iconCell = row.insertCell(0);
+                            const iconUrl = getImageUrl(room.quiz?.icon);
+                            if (iconUrl) {
+                                const iconImg = document.createElement("img");
+                                iconImg.className = "small-picture";
+                                iconImg.style.display = "block";
+                                iconImg.src = iconUrl;
+                                iconImg.onerror = () => {
+                                    iconImg.style.display = "none";
+                                };
+                                iconCell.appendChild(iconImg);
+                            }
+
+                            const titleCell = row.insertCell(1);
+                            titleCell.textContent = room.title;
+                            titleCell.style.fontWeight = "bold";
+
+                            const tokenCell = row.insertCell(2);
+                            tokenCell.textContent = room.room_token;
+                            tokenCell.style.fontFamily = "monospace";
+
+                            const quizCell = row.insertCell(3);
+                            quizCell.textContent = room.quiz.title;
+
+                            const ownerCell = row.insertCell(4);
+                            ownerCell.textContent = room.owner;
+
+                            const playersCell = row.insertCell(5);
+                            playersCell.textContent = `${room.users} 👥`;
+
+                            const statusCell = row.insertCell(6);
+                            if (room.state === "active") {
+                                statusCell.textContent = "🟢 Активна";
+                                statusCell.style.color = "greenyellow";
+                            } else {
+                                statusCell.textContent = "🟡 Ожидание";
+                                statusCell.style.color = "yellow";
+                            }
+                        });
+                    },
+                    (error) => {
+                        console.error("Failed to load rooms:", error);
+                        errorElement.textContent =
+                            "❌ Не удалось загрузить комнаты.";
+                        tbody.innerHTML =
+                            '<tr><td colspan="7" style="text-align: center;">⚠️ Ошибка загрузки</td></tr>';
+                    },
+                );
+            }
+
+            let searchTimeout = null;
+            function onSearchChange() {
+                if (searchTimeout) clearTimeout(searchTimeout);
+                searchTimeout = setTimeout(() => {
+                    const query = document.getElementById("search-query").value;
+                    const count = document.getElementById("search-count").value;
+                    const offset =
+                        document.getElementById("search-offset").value;
+                    loadRooms(query, count, offset);
+                }, 500);
+            }
+
+            function startAutoRefresh() {
+                if (refreshTimeout) clearInterval(refreshTimeout);
+                refreshTimeout = setInterval(() => {
+                    const query = document.getElementById("search-query").value;
+                    const count = document.getElementById("search-count").value;
+                    const offset =
+                        document.getElementById("search-offset").value;
+                    loadRooms(query, count, offset);
+                }, 10000);
+            }
+
+            function init() {
+                loadProfile();
+                loadAchievements();
+
+                const query = document.getElementById("search-query").value;
+                const count = document.getElementById("search-count").value;
+                const offset = document.getElementById("search-offset").value;
+                loadRooms(query, count, offset);
+
+                document
+                    .getElementById("search-query")
+                    .addEventListener("input", onSearchChange);
+                document
+                    .getElementById("search-count")
+                    .addEventListener("change", () => onSearchChange());
+                document
+                    .getElementById("search-offset")
+                    .addEventListener("change", () => onSearchChange());
+
+                document.getElementById("create-room-btn").onclick = () => {
+                    redirect("/quizzes.html");
+                };
+
+                startAutoRefresh();
+            }
+
+            if (document.readyState === "loading") {
+                document.addEventListener("DOMContentLoaded", init);
             } else {
-                // Default avatar
-                avatarImg.src = load_preset("0.png");
+                init();
             }
-        }
-
-        if (nameElement) {
-            nameElement.textContent = profile.nickname || profile.username;
-        }
-    }
-
-    // Show/hide create room button based on role (only moderators and admins)
-    function updateCreateRoomButton(profile) {
-        const createBtn = get_element("create-room-btn");
-        if (createBtn) {
-            // Only show for moderator or administrator
-            if (profile.role === "moderator" || profile.role === "administrator") {
-                createBtn.style.display = "block";
-                createBtn.addEventListener("click", () => {
-                    window.location.href = "/create-room.html";
-                });
-            } else {
-                createBtn.style.display = "none";
-            }
-        }
-    }
-
-    // Load rooms list
-    function loadRooms() {
-        const query = get_element("search-query")?.value || "";
-        const count = get_element("search-count")?.value || 25;
-        const offset = get_element("search-offset")?.value || 0;
-
-        let url = `/rooms/query?count=${count}&offset=${offset}`;
-        if (query.trim()) {
-            url += `&query=${encodeURIComponent(query)}`;
-        }
-
-        request_json(
-            url,
-            "GET",
-            null,
-            (rooms) => {
-                displayRooms(rooms);
-                const errorElement = get_element("rooms-error");
-                if (errorElement) errorElement.textContent = "";
-            },
-            (error) => {
-                console.error("Failed to load rooms:", error);
-                const errorElement = get_element("rooms-error");
-                if (errorElement) errorElement.textContent = "Не удалось загрузить комнаты: " + error.message;
-            }
-        );
-    }
-
-    // Display rooms in table
-    function displayRooms(rooms) {
-        const tbody = get_element("rooms");
-        if (!tbody) return;
-
-        if (!rooms || rooms.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="7" style="text-align: center;">Нет доступных комнат</td></tr>';
-            return;
-        }
-
-        tbody.innerHTML = rooms.map(room => `
-            <tr onclick="window.location.href='/room.html?room_token=${room.room_token}'" style="cursor: pointer;">
-                <td>${getPrivacyIcon(room.privacy)}</td>
-                <td><strong>${escapeHtml(room.title)}</strong></td>
-                <td><code>${room.room_token.substring(0, 8)}...</code></td>
-                <td>${escapeHtml(room.quiz.title)}</td>
-                <td>${escapeHtml(room.owner)}</td>
-                <td>${room.users}</td>
-                <td>${getRoomStateBadge(room.state)}</td>
-             </tr>
-        `).join("");
-    }
-
-    // Helper: Get privacy icon
-    function getPrivacyIcon(privacy) {
-        return privacy === "public" ? "🌐" : "🔒";
-    }
-
-    // Helper: Get room state badge
-    function getRoomStateBadge(state) {
-        if (state === "active") {
-            return '<span style="color: #10b981;">● Играет</span>';
-        }
-        return '<span style="color: #f59e0b;">○ Ожидание</span>';
-    }
-
-    // Load achievements
-    function loadAchievements() {
-        request_json(
-            "/achievements",
-            "GET",
-            null,
-            (achievements) => {
-                displayAchievements(achievements);
-                const errorElement = get_element("achievements-error");
-                if (errorElement) errorElement.textContent = "";
-            },
-            (error) => {
-                console.error("Failed to load achievements:", error);
-                const errorElement = get_element("achievements-error");
-                if (errorElement) errorElement.textContent = "Не удалось загрузить достижения";
-            }
-        );
-    }
-
-    // Display achievements in sidebar
-    function displayAchievements(achievements) {
-        const tbody = get_element("achievements");
-        if (!tbody) return;
-
-        if (!achievements || achievements.length === 0) {
-            tbody.innerHTML = '<tr><td style="text-align: center;">Нет достижений</td></tr>';
-            return;
-        }
-
-        tbody.innerHTML = achievements.map(achievement => `
-            <tr>
-                <td style="display: flex; align-items: center; gap: 10px; padding: 8px;">
-                    ${getAchievementIcon(achievement.icon)}
-                    <div>
-                        <strong>${escapeHtml(achievement.title)}</strong>
-                        <div style="font-size: 0.85em; color: var(--secondary);">
-                            ${achievement.condition === "<secret>" ? "🔒 Скрыто" : escapeHtml(achievement.condition)}
-                        </div>
-                    </div>
-                </td>
-            </tr>
-        `).join("");
-    }
-
-    // Helper: Get achievement icon
-    function getAchievementIcon(icon) {
-        if (typeof icon === "string" && icon.startsWith("data:")) {
-            return `<img src="${icon}" style="width: 32px; height: 32px; object-fit: contain;" />`;
-        } else if (typeof icon === "number" || (typeof icon === "string" && !isNaN(parseInt(icon)))) {
-            const iconNumber = parseInt(icon);
-            if (!isNaN(iconNumber)) {
-                return `<img src="${load_preset(iconNumber + ".png")}" style="width: 32px; height: 32px; object-fit: contain;" />`;
-            }
-        }
-        return `<div style="width: 32px; height: 32px; background: var(--primary); border-radius: 50%; display: flex; align-items: center; justify-content: center;">🏆</div>`;
-    }
-
-    // Setup search with debounce
-    let searchTimeout = null;
-    function setupSearch() {
-        const searchInput = get_element("search-query");
-        const countInput = get_element("search-count");
-        const offsetInput = get_element("search-offset");
-
-        const triggerSearch = () => {
-            if (searchTimeout) clearTimeout(searchTimeout);
-            searchTimeout = setTimeout(() => loadRooms(), 500);
-        };
-
-        if (searchInput) searchInput.addEventListener("input", triggerSearch);
-        if (countInput) countInput.addEventListener("change", loadRooms);
-        if (offsetInput) offsetInput.addEventListener("change", loadRooms);
-    }
-
-    // Escape HTML to prevent XSS
-    function escapeHtml(text) {
-        if (!text) return "";
-        const div = document.createElement("div");
-        div.textContent = text;
-        return div.innerHTML;
-    }
-
-    // Load initial data and set up auto-refresh
-    function init() {
-        loadProfile();
-        loadRooms();
-        loadAchievements();
-        setupSearch();
-
-        // Auto-refresh rooms every 5 seconds
-        if (roomsRefreshInterval) clearInterval(roomsRefreshInterval);
-        roomsRefreshInterval = setInterval(() => loadRooms(), 5000);
-
-        // Auto-refresh achievements every 30 seconds
-        if (achievementsRefreshInterval) clearInterval(achievementsRefreshInterval);
-        achievementsRefreshInterval = setInterval(() => loadAchievements(), 30000);
-    }
-
-    // Cleanup on page unload
-    window.addEventListener("beforeunload", () => {
-        if (roomsRefreshInterval) clearInterval(roomsRefreshInterval);
-        if (achievementsRefreshInterval) clearInterval(achievementsRefreshInterval);
-    });
-
-    // Start the app when DOM is ready
-    if (document.readyState === "loading") {
-        document.addEventListener("DOMContentLoaded", init);
-    } else {
-        init();
-    }
-</script>
+        </script>
     </body>
 </html>

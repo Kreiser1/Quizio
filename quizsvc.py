@@ -5,31 +5,37 @@ import schema
 def create_quiz(
     session: db.Session, 
     author: schema.Username, 
-    quiz_payload: schema.QuizCreate,
+    quiz_create_payload: schema.QuizCreate,
 ) -> schema.Quiz | None:
     creation_date = schema.format_datetime(datetime.now())
     
     new_quiz = db.Quiz(
-        title=quiz_payload.title,
-        icon=quiz_payload.icon,
+        title=quiz_create_payload.title,
+        icon=quiz_create_payload.icon,
         creation_date=creation_date,
         last_edit_username=author,
         last_edit_date=creation_date
     )
 
-    if isinstance(quiz_payload.questions, str):
+    if isinstance(quiz_create_payload.questions, str):
         try:
-            quiz_payload.questions = schema.Quiz.from_yaml(quiz_payload.questions)
+            quiz_create_payload.questions = schema.Quiz.from_yaml(quiz_create_payload.questions)
         except schema.YAMLError:
             return None
 
-    new_quiz.questions = quiz_payload.questions
+    new_quiz.questions = quiz_create_payload.questions
 
     session.add(new_quiz)
+    
+    try:
+        session.flush()
+    except db.IntegrityError:
+        return None
+
     session.execute(db.insert(db.author_quiz).values(username=author, quiz_id=new_quiz.id))
 
-    if quiz_payload.tags:
-        tag_values = [{"tag": tag, "quiz_id": new_quiz.id} for tag in quiz_payload.tags]
+    if quiz_create_payload.tags:
+        tag_values = [{"tag": tag, "quiz_id": new_quiz.id} for tag in quiz_create_payload.tags]
         session.execute(db.insert(db.tag_quiz).values(tag_values))
 
     try:
@@ -39,13 +45,13 @@ def create_quiz(
 
     return schema.Quiz(
         id=new_quiz.id,
-        title=quiz_payload.title,
-        icon=quiz_payload.icon,
-        questions=quiz_payload.questions,
+        title=quiz_create_payload.title,
+        icon=quiz_create_payload.icon,
+        questions=quiz_create_payload.questions,
         creation_date=creation_date,
         last_edit_date=creation_date,
         last_edit_username=author,
-        tags=quiz_payload.tags or set(),
+        tags=quiz_create_payload.tags or set(),
         authors=set((author,))
     )
     
@@ -86,32 +92,32 @@ def update_quiz(
     session: db.Session, 
     username: schema.Username,
     id: schema.Uint,
-    quiz_payload: schema.QuizCreate
+    quiz_update_payload: schema.QuizCreate
 ) -> bool:
-    quiz = get_quiz(session, id)
+    quiz = session.execute(
+        db.select(db.Quiz).where(db.Quiz.id == id)
+    ).scalar_one_or_none()
 
     if not quiz:
         return False
+    
+    quiz.title = quiz_update_payload.title
+    quiz.icon = quiz_update_payload.icon
 
-    quiz.title = quiz_payload.title
-    quiz.icon = quiz_payload.icon
-
-    if isinstance(quiz_payload.questions, str):
-        try:
-            quiz_payload.questions = schema.Quiz.from_yaml(quiz_payload.questions)
-        except schema.YAMLError:
-            return False
-
-    quiz.questions = quiz_payload.questions
+    if isinstance(quiz_update_payload.questions, str):
+        quiz.yaml = quiz_update_payload.questions
+    else:
+        quiz.yaml = schema.Quiz.to_yaml(quiz_update_payload.questions)
 
     quiz.last_edit_date = schema.format_datetime(datetime.now())
     quiz.last_edit_username = username
 
-    if quiz_payload.tags is not None:
+    
+    if quiz_update_payload.tags is not None:
         session.execute(db.delete(db.tag_quiz).where(db.tag_quiz.c.quiz_id == id))
 
-        if quiz_payload.tags:
-            tag_values = [{"tag": tag, "quiz_id": id} for tag in quiz_payload.tags]
+        if quiz_update_payload.tags:
+            tag_values = [{"tag": tag, "quiz_id": id} for tag in quiz_update_payload.tags]
             session.execute(db.insert(db.tag_quiz).values(tag_values))
 
     try:
@@ -119,7 +125,6 @@ def update_quiz(
         return True
     except db.IntegrityError:
         return False
-
 
 def search_quizzes(
     session: db.Session, 
@@ -132,8 +137,7 @@ def search_quizzes(
     conditions = []
 
     if query:
-        search_pattern = f'%{query}%'
-        conditions.append(db.Quiz.title.ilike(search_pattern))
+        conditions.append(db.Quiz.title.ilike(f'%{query}%'))
 
     if tags:
         stmt = stmt.join(db.tag_quiz, db.Quiz.id == db.tag_quiz.c.quiz_id)

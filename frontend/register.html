@@ -1,182 +1,315 @@
 <!doctype html>
 <html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Quizio - Регистрация</title>
+    </head>
+    <link rel="stylesheet" href="theme.css" />
+    <script src="utils.js"></script>
 
-<head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Quizio - Регистрация</title>
-</head>
-<link rel="stylesheet" href="style.css" />
-<script src="utils.js"></script>
+    <body>
+        <section class="nav glass">
+            <h1
+                style="
+                    text-shadow:
+                        0 0 40px #fff,
+                        0 0 80px #fff;
+                "
+            >
+                Quizio
+            </h1>
+        </section>
+        <section class="main glass">
+            <label>
+                <h2>📝 Регистрация</h2>
+            </label>
 
-<body>
-    <section class="nav glass">
-        <h1><a href="/">Quizio</a></h1>
-    </section>
-    <section class="main glass">
-        <label>
-            <h2>Регистрация</h2>
-        </label>
-        <input type="text" id="username" placeholder="Имя пользователя" required autocomplete="username" minlength="4"
-            maxlength="32" pattern="^[a-zA-Z0-9][a-zA-Z0-9._-]*[a-zA-Z0-9]$"
-            title="От 4 до 32 символов. Только латинские буквы, цифры, точки, дефисы и подчеркивания. Не может начинаться или заканчиваться спецсимволами." />
-        <input type="password" id="password" placeholder="Пароль" required autocomplete="new-password" minlength="5"
-            maxlength="64" pattern="^\S+$" title="От 5 до 64 символов, без пробелов" />
-        <input type="email" id="email" placeholder="Электронная почта (необязательно)" autocomplete="email" />
-        <span style="display: flex; gap: 10px;">
-            <button id="register-btn" class="success">Регистрация</button>
-            <button id="login-btn" class="primary">Вход</button>
-        </span>
-        <hr />
-        <label style="color: red" id="error"></label>
-        <label style="color: green" id="success"></label>
-        <script>
-            document.addEventListener('DOMContentLoaded', function () {
-                const registerBtn = document.getElementById('register-btn');
-                const loginBtn = document.getElementById('login-btn');
-                const usernameInput = document.getElementById('username');
-                const passwordInput = document.getElementById('password');
-                const emailInput = document.getElementById('email');
-                const error_msg = document.getElementById('error');
-                const success_msg = document.getElementById('success');
+            <input
+                type="text"
+                id="username"
+                placeholder="👤 Имя пользователя"
+                required
+                autocomplete="username"
+            />
+            <input
+                type="email"
+                id="email"
+                placeholder="Email (необязательно)"
+                autocomplete="email"
+            />
+            <input
+                type="password"
+                id="password"
+                placeholder="Пароль"
+                required
+                autocomplete="new-password"
+            />
+            <input
+                type="password"
+                id="confirm-password"
+                placeholder="Подтверждение пароля"
+                required
+                autocomplete="new-password"
+            />
 
-                // Register button click
-                if (registerBtn) {
-                    registerBtn.addEventListener('click', register);
-                }
+            <span style="display: flex; gap: 10px; justify-content: center">
+                <button id="register-btn" class="success">
+                    📝 Зарегистрироваться
+                </button>
+                <button id="login-btn" class="primary">🚪 Вход</button>
+            </span>
 
-                // Login button click
-                if (loginBtn) {
-                    loginBtn.addEventListener('click', function () {
-                        redirect('/login.html');
-                    });
-                }
+            <hr />
 
-                // Enter key navigation
-                if (usernameInput) {
-                    usernameInput.addEventListener('keypress', function (e) {
-                        if (e.key === 'Enter') {
-                            passwordInput.focus();
+            <div id="error-container" style="text-align: center">
+                <p
+                    id="error"
+                    
+                    style="color: crimson; display: none"
+                ></p>
+                <p
+                    id="success"
+                    
+                    style="color: greenyellow; display: none"
+                ></p>
+            </div>
+
+            <script>
+                const registerBtn = document.getElementById("register-btn");
+                const loginBtn = document.getElementById("login-btn");
+                const usernameInput = document.getElementById("username");
+                const emailInput = document.getElementById("email");
+                const passwordInput = document.getElementById("password");
+                const confirmInput =
+                    document.getElementById("confirm-password");
+                const errorMsg = document.getElementById("error");
+                const successMsg = document.getElementById("success");
+
+                function showError(message) {
+                    successMsg.style.display = "none";
+                    errorMsg.textContent = message;
+                    errorMsg.style.display = "block";
+
+                    setTimeout(() => {
+                        if (errorMsg.textContent === message) {
+                            errorMsg.style.opacity = "0.5";
+                            setTimeout(() => {
+                                if (errorMsg.textContent === message) {
+                                    errorMsg.style.display = "none";
+                                    errorMsg.style.opacity = "";
+                                    errorMsg.textContent = "";
+                                }
+                            }, 2000);
                         }
-                    });
+                    }, 3000);
                 }
 
-                if (passwordInput) {
-                    passwordInput.addEventListener('keypress', function (e) {
-                        if (e.key === 'Enter') {
-                            emailInput.focus();
+                function showSuccess(message) {
+                    errorMsg.style.display = "none";
+                    successMsg.textContent = message;
+                    successMsg.style.display = "block";
+
+                    setTimeout(() => {
+                        if (successMsg.textContent === message) {
+                            successMsg.style.opacity = "0.5";
+                            setTimeout(() => {
+                                if (successMsg.textContent === message) {
+                                    successMsg.style.display = "none";
+                                    successMsg.style.opacity = "";
+                                    successMsg.textContent = "";
+                                }
+                            }, 3000);
                         }
-                    });
+                    }, 5000);
                 }
 
-                if (emailInput) {
-                    emailInput.addEventListener('keypress', function (e) {
-                        if (e.key === 'Enter') {
-                            register();
-                        }
-                    });
+                function clearMessages() {
+                    errorMsg.style.display = "none";
+                    successMsg.style.display = "none";
+                    errorMsg.textContent = "";
+                    successMsg.textContent = "";
                 }
 
-                // Focus on username field by default
-                if (usernameInput) {
-                    usernameInput.focus();
+                function setLoading(button, isLoading) {
+                    if (isLoading) {
+                        button.disabled = true;
+                        button.textContent = "⏳ Регистрация...";
+                    } else {
+                        button.disabled = false;
+                        button.textContent = "📝 Зарегистрироваться";
+                    }
+                }
+
+                function validateUsername(username) {
+                    const usernameRegex =
+                        /^[a-zA-Z0-9][a-zA-Z0-9._-]*[a-zA-Z0-9]$/;
+                    if (username.length < 3) {
+                        return "Имя пользователя должно содержать как минимум 3 символа";
+                    }
+                    if (username.length > 32) {
+                        return "Имя пользователя не должно превышать 32 символа";
+                    }
+                    if (!usernameRegex.test(username)) {
+                        return "Имя пользователя может содержать только буквы, цифры, точки, дефисы и нижние подчёркивания, и должно начинаться и заканчиваться буквой или цифрой";
+                    }
+                    return null;
+                }
+
+                function validateEmail(email) {
+                    if (!email) return null;
+
+                    const emailRegex =
+                        /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+                    if (email.length < 5) {
+                        return "Email слишком короткий";
+                    }
+                    if (email.length > 254) {
+                        return "Email слишком длинный";
+                    }
+                    if (!emailRegex.test(email)) {
+                        return "Введите корректный email адрес";
+                    }
+                    return null;
+                }
+
+                function validatePassword(password) {
+                    if (password.length < 5) {
+                        return "Пароль должен содержать как минимум 5 символов";
+                    }
+                    if (password.length > 128) {
+                        return "Пароль не должен превышать 128 символов";
+                    }
+                    if (/\s/.test(password)) {
+                        return "Пароль не должен содержать пробелов";
+                    }
+                    return null;
                 }
 
                 function register() {
-                    error_msg.innerText = "";
-                    success_msg.innerText = "";
+                    clearMessages();
 
                     const username = usernameInput.value.trim();
-                    const password = passwordInput.value;
                     const email = emailInput.value.trim() || null;
+                    const password = passwordInput.value;
+                    const confirmPassword = confirmInput.value;
 
-                    // Validate username
-                    if (!username) {
-                        error_msg.innerText = "Введите имя пользователя";
+                    const usernameError = validateUsername(username);
+                    if (usernameError) {
+                        showError(`❌ ${usernameError}`);
                         usernameInput.focus();
                         return;
                     }
 
-                    if (username.length < 4 || username.length > 32) {
-                        error_msg.innerText = "Имя пользователя должно быть от 4 до 32 символов";
-                        usernameInput.focus();
+                    const emailError = validateEmail(email);
+                    if (emailError) {
+                        showError(`❌ ${emailError}`);
+                        emailInput.focus();
                         return;
                     }
 
-                    const usernameRegex = /^[a-zA-Z0-9][a-zA-Z0-9._-]*[a-zA-Z0-9]$/;
-                    if (!usernameRegex.test(username)) {
-                        error_msg.innerText = "Имя пользователя содержит недопустимые символы";
-                        usernameInput.focus();
-                        return;
-                    }
-
-                    // Validate password
-                    if (!password) {
-                        error_msg.innerText = "Введите пароль";
+                    const passwordError = validatePassword(password);
+                    if (passwordError) {
+                        showError(`❌ ${passwordError}`);
                         passwordInput.focus();
                         return;
                     }
 
-                    if (password.length < 5 || password.length > 64) {
-                        error_msg.innerText = "Пароль должен быть от 5 до 64 символов";
-                        passwordInput.focus();
+                    if (password !== confirmPassword) {
+                        showError("❌ Пароли не совпадают");
+                        confirmInput.focus();
                         return;
                     }
 
-                    if (password.includes(' ')) {
-                        error_msg.innerText = "Пароль не должен содержать пробелы";
-                        passwordInput.focus();
-                        return;
-                    }
+                    setLoading(registerBtn, true);
 
-                    // Validate email if provided
-                    if (email) {
-                        const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
-                        if (!emailRegex.test(email)) {
-                            error_msg.innerText = "Введите корректный адрес электронной почты";
-                            emailInput.focus();
-                            return;
-                        }
-                    }
-
-                    // Disable button during request
-                    registerBtn.disabled = true;
-                    registerBtn.innerText = "Регистрация...";
-
-                    const payload = {
+                    const registrationData = {
                         username: username,
-                        password: password
+                        password: password,
                     };
 
                     if (email) {
-                        payload.email = email;
+                        registrationData.email = email;
                     }
 
-                    request_json(
-                        "/auth/register",
-                        "POST",
-                        payload,
+                    AuthAPI.register(
+                        registrationData,
                         (response) => {
-                            success_msg.innerText = "Регистрация успешна! Перенаправление на страницу входа...";
-                            // Redirect to login page after short delay
+                            showSuccess(
+                                "✅ Регистрация успешна! Перенаправление на страницу входа...",
+                            );
+
                             setTimeout(() => {
-                                redirect('/login.html');
-                            }, 1500);
+                                redirect("/login.html");
+                            }, 2000);
                         },
                         (error) => {
-                            error_msg.innerText = error;
-                            registerBtn.disabled = false;
-                            registerBtn.innerText = "Регистрация";
+                            console.error("Registration failed:", error);
+                            let errorMessage =
+                                "❌ Не удалось зарегистрироваться";
 
-                            // Clear password on error for security
+                            if (error.message) {
+                                if (
+                                    error.message.includes("409") ||
+                                    error.message.includes("already exists")
+                                ) {
+                                    errorMessage =
+                                        "❌ Пользователь с таким именем уже существует";
+                                } else if (error.message.includes("422")) {
+                                    errorMessage =
+                                        "❌ Неверный формат данных. Проверьте введённую информацию.";
+                                } else if (error.message.includes("429")) {
+                                    errorMessage =
+                                        "⏰ Слишком много попыток. Подождите немного.";
+                                } else if (error.message.includes("500")) {
+                                    errorMessage =
+                                        "⚠️ Неизвестная ошибка. Попробуйте позже.";
+                                }
+                            }
+
+                            showError(errorMessage);
+                            setLoading(registerBtn, false);
+
                             passwordInput.value = "";
+                            confirmInput.value = "";
                             passwordInput.focus();
                         },
                     );
                 }
-            });
-        </script>
-    </section>
-</body>
 
+                function goToLogin() {
+                    redirect("/login.html");
+                }
+
+                registerBtn.addEventListener("click", register);
+                loginBtn.addEventListener("click", goToLogin);
+
+                usernameInput.addEventListener("keypress", (e) => {
+                    if (e.key === "Enter") {
+                        emailInput.focus();
+                    }
+                });
+
+                emailInput.addEventListener("keypress", (e) => {
+                    if (e.key === "Enter") {
+                        passwordInput.focus();
+                    }
+                });
+
+                passwordInput.addEventListener("keypress", (e) => {
+                    if (e.key === "Enter") {
+                        confirmInput.focus();
+                    }
+                });
+
+                confirmInput.addEventListener("keypress", (e) => {
+                    if (e.key === "Enter") {
+                        register();
+                    }
+                });
+
+                usernameInput.focus();
+            </script>
+        </section>
+    </body>
 </html>

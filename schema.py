@@ -84,7 +84,7 @@ class UserRegistration(BaseModel):
 
 
 class UserUpdate(BaseModel):
-    full_name: Name | None = None
+    nickname: Name | None = None
     avatar: Uint | Base64 | None = None
 
 
@@ -94,7 +94,7 @@ class UserRecovery(BaseModel):
 
 
 class UserCredentialsUpdate(BaseModel):
-    old_password: Password
+    old_password: Password | None = None
     new_password: Password | None = None
     new_email: Email | None = None
 
@@ -107,7 +107,7 @@ class Question(BaseModel):
     code: Text | None = None
     type: QuestionType | None
     answer: set[Uint] | Uint | Text | None
-    hint: set[Uint] | Text | None
+    hint: set[Uint] | None
     time: Ufloat | None = None
 
 
@@ -236,7 +236,7 @@ class RoomStream(BaseModel):
     image: Base64 | None
     code: Text | None
     question_type: QuestionType | None
-    hint: set[Uint] | Text | None
+    hint: set[Uint] | None
     time: Ufloat | None = None
 
 
@@ -306,6 +306,7 @@ class Room(BaseModel):
             self._last_refresh_time = current_time
 
         delta_time = current_time - self._last_refresh_time
+        self._last_refresh_time = current_time
 
         if delta_time <= 0:
             return
@@ -319,7 +320,7 @@ class Room(BaseModel):
 
     def submit(self, username: Username, answer: Answer) -> bool:
         user = next((user for user in self.users if user.username == username), None)
-    
+
         if not user or answer.question != self.question:
             return False
 
@@ -327,6 +328,8 @@ class Room(BaseModel):
             question: Question = self.quiz.questions[self.question]
         except IndexError:
             return False
+        
+        print(answer.answer, '==', question.answer)
         
         if any(user_answer.question == answer.question for user_answer in user.answers):
             return False

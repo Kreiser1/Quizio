@@ -10,6 +10,7 @@ import usersvc
 import config
 import security
 import database as db
+import achisvc
 from time import perf_counter
 from exceptions import *
 
@@ -53,11 +54,11 @@ def search_rooms(
 
     return roomsvc.search_rooms(query=query, count=count, offset=offset, include_private=(role in ('moderator', 'administrator')))
 
-@router.get('/{room_token}', response_model=schema.RoomStream)
+@router.get('/{room_token}', response_model=schema.RoomPreview)
 def get_room(
     moderator: depends.Moderator,
     room_token: schema.HexString = Path(...)
-) -> schema.RoomStream:
+) -> schema.RoomPreview:
     """Получить данные комнаты."""
 
     room = roomsvc.get_room(room_token)
@@ -65,7 +66,7 @@ def get_room(
     if not room:
         raise NotFoundHTTPException("Не удалось найти комнату.")
     
-    return room.stream
+    return room.preview
 
 @router.post('/{room_token}/answer')
 def submit_answer(
@@ -84,6 +85,7 @@ def submit_answer(
 
 @router.post('/{room_token}/control')
 def control_room(
+    session: depends.Session,
     moderator: depends.Moderator,
     username: depends.Username,
     room_token: schema.HexString = Path(...),
@@ -97,6 +99,10 @@ def control_room(
         raise NotFoundHTTPException("Не удалось найти комнату.")
 
     if payload.command == 'shutdown':
+        for achievement in achisvc.get_achievements(session):
+            for user in room.users:
+                achisvc.test_achievement(session, achievement, room, user)
+
         if not roomsvc.delete_room(room_token):
             raise UnknownHTTPException("Не удалось завершить комнату.")
     elif payload.command == 'show':
@@ -275,11 +281,11 @@ async def room_stream(
     try:
         while True:
             if room_token not in roomsvc.ROOMS:
-                await websocket.close()
+                await websocket.close(code=1008, reason="Комната была завершена.")
                 break
 
-            if user.connection == 'banned':
-                await websocket.close()
+            if user.connection == 'banned' and not role in ('moderator', 'administrator'):
+                await websocket.close(code=1008, reason="Вы были забанены.")
                 break
 
             room.refresh(perf_counter())
