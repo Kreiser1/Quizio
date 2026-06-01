@@ -12,7 +12,7 @@ from exceptions import *
 
 router = APIRouter(prefix='/achievements', tags=['Достижения'])
 
-SAFE_PATTERN = re.compile(r'^(?!.*__)(?!.*\bpow\b)(?!.*exec)(?!.*{})(?!.*eval)(?!.*<<)(?!.*setattr)(?!.*lambda)(?!.*def)(?!.*format)(?!.*getattr)(?!.*local)(?!.*global)(?!.*>>)(?!.*\*\*)(?!.*%)(?!.*\bclass\b)(?!.*\\x[0-9a-fA-F]{2})[a-zA-Z0-9\s\.&|!=<>()[\]\'"]+$')
+SAFE_PATTERN = re.compile(r'^(?!.*__)(?!.*\bpow\b)(?!.*exec)(?!.*{})(?!.*eval)(?!.*<<)(?!.*setattr)(?!.*lambda)(?!.*def)(?!.*format)(?!.*getattr)(?!.*local)(?!.*global)(?!.*>>)(?!.*\*\*)(?!.*%)(?!.*\bclass\b)(?!.*\\x)(?!.*\\u)[a-zA-Z0-9\s\.&|!=<>()[\]\'"]+$')
 
 @router.post('', response_model=schema.Achievement, status_code=status.HTTP_201_CREATED)
 def create_achievement(
