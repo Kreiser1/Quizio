@@ -8,6 +8,28 @@
     <link rel="stylesheet" href="theme.css" />
     <script src="utils.js"></script>
 
+    <style>
+        .delete-btn {
+            padding: 4px 8px;
+            font-size: 12px;
+            margin-left: 10px;
+        }
+
+        .achievement-row {
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        .achievement-row:hover {
+            background-color: rgba(255, 255, 255, 0.05);
+        }
+
+        .action-cell {
+            white-space: nowrap;
+            width: 50px;
+        }
+    </style>
+
     <body>
         <section class="nav glass">
             <h1
@@ -57,12 +79,12 @@
                     class="success"
                     style="display: none"
                 >
-                    Создать
+                    ➕ Создать
                 </button>
             </div>
 
             <div style="flex: 1; overflow-x: auto; width: 100%">
-                <table style="width: 100%; min-width: 300px">
+                <table style="width: 100%; min-width: 400px">
                     <thead>
                         <tr>
                             <th style="width: 80px"></th>
@@ -70,6 +92,10 @@
                             <th id="condition-header" style="display: none">
                                 Условие
                             </th>
+                            <th
+                                id="actions-header"
+                                style="display: none; width: 60px"
+                            ></th>
                         </tr>
                     </thead>
                     <tbody id="achievements"></tbody>
@@ -175,6 +201,27 @@
                 }, 3000);
             }
 
+            function showSuccess(message) {
+                const errorElement =
+                    document.getElementById("achievements-error");
+                errorElement.textContent = message;
+                errorElement.style.color = "greenyellow";
+                errorElement.style.display = "block";
+
+                setTimeout(() => {
+                    if (errorElement.textContent === message) {
+                        errorElement.style.opacity = "0.5";
+                        setTimeout(() => {
+                            if (errorElement.textContent === message) {
+                                errorElement.style.display = "none";
+                                errorElement.style.color = "crimson";
+                                errorElement.style.opacity = "";
+                            }
+                        }, 2000);
+                    }
+                }, 3000);
+            }
+
             function updateStats(userCount, totalCount) {
                 const percentage =
                     totalCount > 0
@@ -183,6 +230,42 @@
                 document.getElementById("progress-bar").style.width =
                     `${percentage}%`;
                 document.getElementById("percent").textContent = percentage;
+            }
+
+            function deleteAchievement(achievementId, achievementTitle) {
+                if (
+                    confirm(
+                        `❓ Вы уверены, что хотите удалить достижение "${achievementTitle}"?`,
+                    )
+                ) {
+                    AchievementsAPI.delete(
+                        achievementId,
+                        () => {
+                            showSuccess(
+                                `✅ Достижение "${achievementTitle}" удалено`,
+                            );
+
+                            loadAllAchievements();
+                            loadUserAchievements();
+                        },
+                        (error) => {
+                            console.error(
+                                "Failed to delete achievement:",
+                                error,
+                            );
+                            let errorMessage =
+                                "❌ Не удалось удалить достижение";
+                            if (
+                                error.message &&
+                                error.message.includes("403")
+                            ) {
+                                errorMessage =
+                                    "❌ У вас нет прав для удаления этого достижения";
+                            }
+                            showError(errorMessage);
+                        },
+                    );
+                }
             }
 
             function loadProfile() {
@@ -232,13 +315,17 @@
 
                         const conditionHeader =
                             document.getElementById("condition-header");
+                        const actionsHeader =
+                            document.getElementById("actions-header");
                         if (
                             currentUserRole === "moderator" ||
                             currentUserRole === "administrator"
                         ) {
                             conditionHeader.style.display = "table-cell";
+                            actionsHeader.style.display = "table-cell";
                         } else {
                             conditionHeader.style.display = "none";
+                            actionsHeader.style.display = "none";
                         }
 
                         const quizzesBtn =
@@ -256,7 +343,8 @@
                         console.error("Failed to load profile:", error);
                         if (
                             error.message.includes("401") ||
-                            error.message.includes("403")
+                            error.message.includes("403") ||
+                            error.message.includes("404")
                         ) {
                             redirect("/login.html");
                         }
@@ -313,7 +401,7 @@
                             cell.colSpan =
                                 currentUserRole === "moderator" ||
                                 currentUserRole === "administrator"
-                                    ? 3
+                                    ? 4
                                     : 2;
                             cell.textContent = "✨ Нет доступных достижений";
                             cell.style.textAlign = "center";
@@ -324,6 +412,7 @@
 
                         achievements.forEach((achievement) => {
                             const row = tbody.insertRow();
+                            row.className = "achievement-row";
 
                             const iconCell = row.insertCell(0);
                             const iconUrl = getImageUrl(achievement.icon);
@@ -352,8 +441,28 @@
                                         achievement.condition;
                                     conditionCell.style.fontFamily =
                                         "monospace";
-                                    conditionCell.style.color = "orange";
+                                    conditionCell.style.fontSize = "12px";
+                                    conditionCell.style.color = "yellow";
                                 }
+
+                                const actionsCell = row.insertCell(3);
+                                actionsCell.className = "action-cell";
+
+                                const deleteBtn =
+                                    document.createElement("button");
+                                deleteBtn.textContent = "🗑️";
+                                deleteBtn.className = "danger";
+                                deleteBtn.style.padding = "4px 8px";
+                                deleteBtn.style.fontSize = "12px";
+                                deleteBtn.title = "Удалить достижение";
+                                deleteBtn.onclick = (e) => {
+                                    e.stopPropagation();
+                                    deleteAchievement(
+                                        achievement.id,
+                                        achievement.title,
+                                    );
+                                };
+                                actionsCell.appendChild(deleteBtn);
                             }
                         });
                     },

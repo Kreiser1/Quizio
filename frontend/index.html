@@ -22,8 +22,12 @@
             <a href="/"><h4>🏠 Главная</h4></a>
             <a href="/profile.html"><h4>👤 Профиль</h4></a>
             <a href="/achievements.html"><h4>🏆 Достижения</h4></a>
-            <a href="/quizzes.html" id="quizzes-btn" style="display: none;"><h4>📚 Викторины</h4></a>
-            <a href="/admin.html" id="admin-btn" style="display: none;"><h4>👑 Администрирование</h4></a>
+            <a href="/quizzes.html" id="quizzes-btn" style="display: none"
+                ><h4>📚 Викторины</h4></a
+            >
+            <a href="/admin.html" id="admin-btn" style="display: none"
+                ><h4>👑 Администрирование</h4></a
+            >
         </section>
         <section class="profile glass">
             <a href="/profile.html"
@@ -89,6 +93,13 @@
                 >
                     Создать
                 </button>
+                <button
+                    id="join-room-btn"
+                    class="primary"
+                    style="display: none"
+                >
+                    🔑 Войти по билету
+                </button>
             </div>
         </section>
         <section
@@ -119,8 +130,48 @@
                 return role === "administrator"
                     ? "crimson"
                     : role === "moderator"
-                      ? "#f59e0b"
-                      : "#10b981";
+                      ? "yellow"
+                      : "greenyellow";
+            }
+
+            function showError(message) {
+                const errorElement = document.getElementById("rooms-error");
+                errorElement.textContent = message;
+                errorElement.style.color = "crimson";
+
+                setTimeout(() => {
+                    if (errorElement.textContent === message) {
+                        errorElement.style.opacity = "0.5";
+                        setTimeout(() => {
+                            if (errorElement.textContent === message) {
+                                errorElement.textContent = "";
+                                errorElement.style.opacity = "";
+                            }
+                        }, 2000);
+                    }
+                }, 3000);
+            }
+
+            function joinByCode() {
+                const roomToken = prompt("🔑 Введите билет комнаты для входа:");
+                if (!roomToken) return;
+
+                const hexPattern = /^[0-9a-fA-F]+$/;
+                if (!hexPattern.test(roomToken)) {
+                    showError("❌ Неверный формат билета");
+                    return;
+                }
+
+                RoomsAPI.get(
+                    roomToken,
+                    () => {
+                        redirect(`/room.html?token=${roomToken}`);
+                    },
+                    (error) => {
+                        console.error("Failed to find room:", error);
+                        showError("❌ Комната с таким билетом не найдена");
+                    },
+                );
             }
 
             function loadProfile() {
@@ -150,13 +201,18 @@
 
                         const createBtn =
                             document.getElementById("create-room-btn");
+                        const joinBtn =
+                            document.getElementById("join-room-btn");
+
                         if (
                             currentUserRole === "moderator" ||
                             currentUserRole === "administrator"
                         ) {
                             createBtn.style.display = "block";
+                            joinBtn.style.display = "none";
                         } else {
                             createBtn.style.display = "none";
+                            joinBtn.style.display = "block";
                         }
 
                         const quizzesBtn =
@@ -172,14 +228,18 @@
 
                         const adminBtn = document.getElementById("admin-btn");
                         if (adminBtn) {
-                            adminBtn.style.display = (currentUserRole === "administrator") ? "block" : "none";
+                            adminBtn.style.display =
+                                currentUserRole === "administrator"
+                                    ? "block"
+                                    : "none";
                         }
                     },
                     (error) => {
                         console.error("Failed to load profile:", error);
                         if (
                             error.message.includes("401") ||
-                            error.message.includes("403")
+                            error.message.includes("403") ||
+                            error.message.includes("404")
                         ) {
                             redirect("/login.html");
                         }
@@ -242,7 +302,7 @@
                 const errorElement = document.getElementById("rooms-error");
 
                 tbody.innerHTML =
-                    '<tr><td colspan="7" style="text-align: center;">⏳ Загрузка...</td></tr>';
+                    '<tr><td colspan="7" style="text-align: center;">⏳ Загрузка...</td</tr>';
                 errorElement.textContent = "";
 
                 const params = {
@@ -316,10 +376,10 @@
                             const statusCell = row.insertCell(6);
                             if (room.state === "active") {
                                 statusCell.textContent = "🟢 Активна";
-                                statusCell.style.color = "greenyellow";
+                                statusCell.style.color = "#10b981";
                             } else {
                                 statusCell.textContent = "🟡 Ожидание";
-                                statusCell.style.color = "yellow";
+                                statusCell.style.color = "#f59e0b";
                             }
                         });
                     },
@@ -328,7 +388,7 @@
                         errorElement.textContent =
                             "❌ Не удалось загрузить комнаты.";
                         tbody.innerHTML =
-                            '<tr><td colspan="7" style="text-align: center;">⚠️ Ошибка загрузки</td></tr>';
+                            '<tr><td colspan="7" style="text-align: center;">⚠️ Ошибка загрузки</td</tr>';
                     },
                 );
             }
@@ -377,6 +437,10 @@
 
                 document.getElementById("create-room-btn").onclick = () => {
                     redirect("/quizzes.html");
+                };
+
+                document.getElementById("join-room-btn").onclick = () => {
+                    joinByCode();
                 };
 
                 startAutoRefresh();

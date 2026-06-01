@@ -246,7 +246,8 @@
                         console.error("Failed to load profile:", error);
                         if (
                             error.message.includes("401") ||
-                            error.message.includes("403")
+                            error.message.includes("403") ||
+                            error.message.includes("404")
                         ) {
                             redirect("/login.html");
                         }
@@ -310,9 +311,6 @@
                             if (avatarUrl) {
                                 const avatarImg = document.createElement("img");
                                 avatarImg.className = "small-picture";
-                                avatarImg.style.width = "32px";
-                                avatarImg.style.height = "32px";
-                                avatarImg.style.borderRadius = "50%";
                                 avatarImg.src = avatarUrl;
                                 avatarImg.onerror = () =>
                                     (avatarImg.style.display = "none");

@@ -112,7 +112,7 @@ room.privacy == "private"'
                 </label>
                 <p
                     id="condition-warning"
-                    style="color: #f59e0b; font-size: 12px; display: none"
+                    style="color: yellow; font-size: 12px; display: none"
                 ></p>
             </div>
 
@@ -126,7 +126,7 @@ room.privacy == "private"'
             <hr />
 
             <p id="error" style="color: crimson; display: none"></p>
-            <p id="success" style="color: #10b981; display: none"></p>
+            <p id="success" style="color: greenyellow; display: none"></p>
         </section>
 
         <section class="side glass scroll" style="width: 100%">
@@ -170,8 +170,8 @@ user.score >= 500 and user.answers_streak >= 3</pre
                 return role === "administrator"
                     ? "crimson"
                     : role === "moderator"
-                      ? "#f59e0b"
-                      : "#10b981";
+                      ? "yellow"
+                      : "greenyellow";
             }
 
             function showMessage(element, message, isError = true) {
@@ -197,46 +197,6 @@ user.score >= 500 and user.answers_streak >= 3</pre
             function hideMessages() {
                 document.getElementById("error").style.display = "none";
                 document.getElementById("success").style.display = "none";
-            }
-
-            function validateCondition(condition, userRole) {
-                if (userRole !== "administrator" && condition.length > 128) {
-                    return "❌ Условие слишком длинное (максимум 128 символов для модераторов)";
-                }
-
-                const forbiddenPatterns = [
-                    {
-                        pattern: /__/,
-                        message:
-                            "❌ Запрещено использование двойного подчеркивания (__)",
-                    },
-                    {
-                        pattern: /\bpow\s*\(/,
-                        message: "❌ Запрещено использование функции pow()",
-                    },
-                    {
-                        pattern: /<</,
-                        message: "❌ Запрещен оператор сдвига влево (<<)",
-                    },
-                    {
-                        pattern: />>/,
-                        message: "❌ Запрещен оператор сдвига вправо (>>)",
-                    },
-                ];
-
-                for (const { pattern, message } of forbiddenPatterns) {
-                    if (pattern.test(condition)) {
-                        return message;
-                    }
-                }
-
-                const allowedPattern =
-                    /^[a-zA-Z0-9\s\.&|!=<>()[\]'"\x27\x22]+$/;
-                if (!allowedPattern.test(condition)) {
-                    return "❌ Условие содержит запрещенные символы. Разрешены только буквы, цифры, пробелы и символы: . & | ! = < > [ ] ( ) ' \"";
-                }
-
-                return null;
             }
 
             function loadProfile() {
@@ -283,7 +243,8 @@ user.score >= 500 and user.answers_streak >= 3</pre
                         console.error("Failed to load profile:", error);
                         if (
                             error.message.includes("401") ||
-                            error.message.includes("403")
+                            error.message.includes("403") ||
+                            error.message.includes("404")
                         ) {
                             redirect("/login.html");
                         }
@@ -350,19 +311,6 @@ user.score >= 500 and user.answers_streak >= 3</pre
                     showMessage(
                         document.getElementById("error"),
                         "❌ Условие должно содержать минимум 4 символа",
-                    );
-                    conditionInput.focus();
-                    return;
-                }
-
-                const validationError = validateCondition(
-                    condition,
-                    currentUserRole,
-                );
-                if (validationError) {
-                    showMessage(
-                        document.getElementById("error"),
-                        validationError,
                     );
                     conditionInput.focus();
                     return;

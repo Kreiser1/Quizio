@@ -6,10 +6,7 @@
         <title>Quizio - Комната</title>
 
         <link rel="stylesheet" href="theme.css" />
-        <link
-            rel="stylesheet"
-            href="github-dark.css"
-        />
+        <link rel="stylesheet" href="github-dark.css" />
 
         <script src="utils.js"></script>
         <script src="highlight.js"></script>
@@ -46,7 +43,6 @@
                 font-family: inherit;
             }
 
-            /* Highlight.js theme customization */
             .hljs {
                 background: transparent !important;
             }
@@ -184,7 +180,7 @@
             <a href="/"><h4>🏠 Главная</h4></a>
             <a href="/profile.html"><h4>👤 Профиль</h4></a>
             <a href="/achievements.html"><h4>🏆 Достижения</h4></a>
-            <a href="/quizzes.html"><h4>📚 Викторины</h4></a>
+            <a href="/quizzes.html" id="quizzes-btn"><h4>📚 Викторины</h4></a>
             <a href="/admin.html" id="admin-btn" style="display: none"
                 ><h4>👑 Администрирование</h4></a
             >
@@ -359,8 +355,8 @@
                     return role === "administrator"
                         ? "crimson"
                         : role === "moderator"
-                          ? "#f59e0b"
-                          : "#10b981";
+                          ? "yellow"
+                          : "greenyellow";
                 }
 
                 function highlightCode(element, code) {
@@ -417,6 +413,17 @@
                                     (avatarElement.style.display = "none");
                             } else {
                                 avatarElement.style.display = "none";
+                            }
+
+                            const quizzesBtn =
+                                document.getElementById("quizzes-btn");
+                            if (
+                                currentUserRole === "moderator" ||
+                                currentUserRole === "administrator"
+                            ) {
+                                quizzesBtn.style.display = "block";
+                            } else {
+                                quizzesBtn.style.display = "none";
                             }
 
                             const adminBtn =
@@ -568,9 +575,6 @@
                             confirm("Вы уверены, что хотите завершить комнату?")
                         ) {
                             sendControlCommand("shutdown", null);
-                            setTimeout(() => {
-                                window.location.href = "/";
-                            }, 1000);
                         }
                     });
                 }
@@ -657,17 +661,7 @@
                             );
                             newSubmitBtn.onclick = () => {
                                 if (selectedAnswers.size > 0) {
-                                    const answersArray =
-                                        Array.from(selectedAnswers);
-                                    console.log(
-                                        "Multiselect submitting:",
-                                        answersArray,
-                                    );
-                                    submitAnswer(answersArray);
-                                } else {
-                                    console.log(
-                                        "No answers selected for multiselect",
-                                    );
+                                    submitAnswer(Array.from(selectedAnswers));
                                 }
                             };
                         } else {
@@ -678,23 +672,14 @@
 
                 function submitAnswer(answer) {
                     if (currentQuestionIndex === null) {
-                        console.log("No active question");
                         return;
                     }
 
                     if (isSubmitting) {
-                        console.log("Already submitting, ignoring...");
                         return;
                     }
 
                     isSubmitting = true;
-
-                    console.log(
-                        "Submit - Type:",
-                        currentQuestionType,
-                        "Answer:",
-                        answer,
-                    );
 
                     let formattedAnswer;
 
@@ -707,7 +692,6 @@
                         formattedAnswer = answer.map((v) =>
                             typeof v === "number" ? v : parseInt(v),
                         );
-                        console.log("Formatted multiselect:", formattedAnswer);
                     } else {
                         formattedAnswer = answer;
                     }
@@ -719,7 +703,6 @@
                             answer: formattedAnswer,
                         },
                         (isCorrect) => {
-                            console.log("Result:", isCorrect);
                             isSubmitting = false;
 
                             if (currentQuestionType === "select") {
@@ -734,7 +717,7 @@
                                             : parseInt(answer))
                                     ) {
                                         btn.style.backgroundColor = isCorrect
-                                            ? "#10b981"
+                                            ? "greenyellow"
                                             : "crimson";
                                         setTimeout(() => {
                                             btn.style.backgroundColor = "";
@@ -750,7 +733,7 @@
                                     const btnValue = parseInt(btn.textContent);
                                     if (selectedAnswers.has(btnValue)) {
                                         btn.style.backgroundColor = isCorrect
-                                            ? "#10b981"
+                                            ? "greenyellow"
                                             : "crimson";
                                         setTimeout(() => {
                                             btn.style.backgroundColor = "";
@@ -767,7 +750,7 @@
                                 }, 500);
                             } else {
                                 submitAnswerBtn.style.backgroundColor =
-                                    isCorrect ? "#10b981" : "crimson";
+                                    isCorrect ? "greenyellow" : "crimson";
                                 setTimeout(() => {
                                     submitAnswerBtn.style.backgroundColor = "";
                                 }, 500);
@@ -807,7 +790,9 @@
                         ws + `/rooms/${currentRoomToken}/stream`,
                     );
 
-                    socket.onopen = () => console.log("WebSocket connected");
+                    let lastRoomStream = null;
+
+                    socket.onopen = () => console.log("WebSocket connected.");
 
                     socket.onmessage = (event) => {
                         try {
@@ -816,9 +801,10 @@
                                 !roomStream ||
                                 Object.keys(roomStream).length === 0
                             ) {
-                                window.location.href = "/";
+                                redirect("/");
                                 return;
                             }
+                            lastRoomStream = roomStream;
                             updateRoomDisplay(roomStream);
                         } catch (error) {
                             console.error("Parse error:", error);
@@ -829,13 +815,22 @@
                         console.error("WebSocket error:", error);
 
                     socket.onclose = (event) => {
-                        console.log(
-                            "WebSocket closed:",
-                            event.code,
-                            event.reason,
-                        );
-                        if (event.code !== 1000) {
-                            window.location.href = "/";
+                        if (event.code === 1000 && lastRoomStream) {
+                            sessionStorage.setItem(
+                                "finalRoomData",
+                                JSON.stringify({
+                                    users: lastRoomStream.users,
+                                    title: lastRoomStream.title,
+                                    timestamp: new Date()
+                                        .toISOString()
+                                        .replace("T", " ")
+                                        .replace(/\..+/, ""),
+                                }),
+                            );
+
+                            redirect("/leaderboard.html");
+                        } else if (event.code !== 1000) {
+                            redirect("/");
                         }
                     };
                 }

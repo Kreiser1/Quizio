@@ -153,7 +153,7 @@
             <hr />
 
             <p id="error" style="color: crimson; display: none"></p>
-            <p id="success" style="color: #10b981; display: none"></p>
+            <p id="success" style="color: greenyellow; display: none"></p>
         </section>
 
         <section class="side glass scroll" style="width: 100%">
@@ -294,7 +294,8 @@
                         console.error("Failed to load profile:", error);
                         if (
                             error.message.includes("401") ||
-                            error.message.includes("403")
+                            error.message.includes("403") ||
+                            error.message.includes("404")
                         ) {
                             redirect("/login.html");
                         }

@@ -84,11 +84,15 @@ html > body > section.side {
 img.small-picture {
     width: 64px;
     height: 64px;
+    min-width: 64px;
+    min-height: 64px;
 }
 
 img.medium-picture {
     width: 256px;
     height: 256px;
+    min-width: 256px;
+    min-height: 256px;
 }
 
 img.large-picture {

@@ -122,7 +122,7 @@
 
                     if (cancelBtn) {
                         cancelBtn.addEventListener("click", function () {
-                            window.location.href = "/";
+                            redirect('/')
                         });
                     }
 
@@ -201,7 +201,7 @@
                                     "Комната успешно создана! Перенаправление...";
 
                                 setTimeout(() => {
-                                    window.location.href = `/room.html?room_token=${response}`;
+                                    redirect(`/room.html?room_token=${response}`);
                                 }, 1500);
                             },
                             (error) => {

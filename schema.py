@@ -115,15 +115,6 @@ class Answer(BaseModel):
     question: Uint
     answer: set[Uint] | Uint | Text
 
-    def __hash__(self):
-        return hash(self.answer)
-
-    def __eq__(self, other):
-        if not isinstance(other, Answer):
-            return False
-        
-        return self.answer == other.answer
-
 
 class QuizPreview(BaseModel):
     id: Uint
@@ -183,7 +174,7 @@ class RoomUser(BaseModel):
     connection: Literal['connected', 'disconnected', 'banned']
     score: Uint
     answers_streak: Uint
-    answers: set[Answer]
+    answered_questions: set[Uint] = set()
     
     def __hash__(self):
         return hash(self.username)
@@ -284,7 +275,7 @@ class Room(BaseModel):
             question_type=question.type,
             hint=question.hint,
             time=self.time if self.question is not None and self.question < len(self.quiz.questions) else None
-        )
+        ).model_copy(deep=True)
     
     def start(self, question: Uint):
         self.question = question if question < len(self.quiz.questions) else None
@@ -323,15 +314,13 @@ class Room(BaseModel):
 
         if not user or answer.question != self.question:
             return False
-
+        
+        if answer.question in user.answered_questions:
+            return False
+       
         try:
             question: Question = self.quiz.questions[self.question]
         except IndexError:
-            return False
-        
-        print(answer.answer, '==', question.answer)
-        
-        if any(user_answer.question == answer.question for user_answer in user.answers):
             return False
 
         user_answer = answer.answer
@@ -350,12 +339,12 @@ class Room(BaseModel):
 
         if is_correct:
             streak_bonus = min(1 + user.answers_streak * 0.1, 1.5)
-            user.score += question.score * streak_bonus
+            user.score += Uint(question.score * streak_bonus)
             user.answers_streak += 1
         else:
             user.answers_streak = 0
 
-        user.answers.add(answer)
+        user.answered_questions.add(answer.question)
 
         return is_correct
     
@@ -395,8 +384,7 @@ class Room(BaseModel):
             nickname=nickname or username,
             connection='disconnected',
             score=0,
-            answers_streak=0,
-            answers=set(),
+            answers_streak=0
         )
 
         self.users.add(new_user)

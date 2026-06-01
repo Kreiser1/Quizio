@@ -101,9 +101,10 @@
             </div>
 
             <div style="flex: 1; overflow-x: auto; width: 100%">
-                <table style="width: 100%; min-width: 800px">
+                <table style="width: 100%; min-width: 900px">
                     <thead>
                         <tr>
+                            <th style="width: 50px">ID</th>
                             <th style="width: 60px"></th>
                             <th>Название</th>
                             <th>Авторы</th>
@@ -201,8 +202,8 @@
                 return role === "administrator"
                     ? "crimson"
                     : role === "moderator"
-                      ? "#f59e0b"
-                      : "#10b981";
+                      ? "yellow"
+                      : "greenyellow";
             }
 
             function showError(message) {
@@ -308,7 +309,8 @@
                         console.error("Failed to load profile:", error);
                         if (
                             error.message.includes("401") ||
-                            error.message.includes("403")
+                            error.message.includes("403") ||
+                            error.message.includes("404")
                         ) {
                             redirect("/login.html");
                         }
@@ -357,7 +359,7 @@
                 const errorElement = document.getElementById("quizzes-error");
 
                 tbody.innerHTML =
-                    '<tr><td colspan="7" style="text-align: center;">⏳ Загрузка...</td</tr>';
+                    '<tr><td colspan="8" style="text-align: center;">⏳ Загрузка...</td<tr>';
                 errorElement.style.display = "none";
 
                 const params = {
@@ -376,7 +378,7 @@
                         if (quizzes.length === 0) {
                             const row = tbody.insertRow();
                             const cell = row.insertCell(0);
-                            cell.colSpan = 7;
+                            cell.colSpan = 8;
                             cell.textContent = "📭 Нет доступных викторин";
                             cell.style.textAlign = "center";
                             cell.style.padding = "40px";
@@ -393,13 +395,17 @@
                             totalQuestions += quiz.questions;
                             totalScore += quiz.score;
 
-                            const iconCell = row.insertCell(0);
+                            const idCell = row.insertCell(0);
+                            idCell.textContent = quiz.id;
+                            idCell.style.fontFamily = "monospace";
+                            idCell.style.fontSize = "12px";
+                            idCell.style.color = "var(--secondary)";
+
+                            const iconCell = row.insertCell(1);
                             const iconUrl = getImageUrl(quiz.icon);
                             if (iconUrl) {
                                 const iconImg = document.createElement("img");
                                 iconImg.className = "small-picture";
-                                iconImg.style.width = "32px";
-                                iconImg.style.height = "32px";
                                 iconImg.style.display = "block";
                                 iconImg.src = iconUrl;
                                 iconImg.onerror = () => {
@@ -408,11 +414,11 @@
                                 iconCell.appendChild(iconImg);
                             }
 
-                            const titleCell = row.insertCell(1);
+                            const titleCell = row.insertCell(2);
                             titleCell.textContent = quiz.title;
                             titleCell.style.fontWeight = "bold";
 
-                            const authorsCell = row.insertCell(2);
+                            const authorsCell = row.insertCell(3);
                             authorsCell.textContent = Array.isArray(
                                 quiz.authors,
                             )
@@ -420,17 +426,17 @@
                                 : quiz.authors;
                             authorsCell.style.fontSize = "12px";
 
-                            const questionsCell = row.insertCell(3);
+                            const questionsCell = row.insertCell(4);
                             questionsCell.textContent = quiz.questions;
                             questionsCell.style.textAlign = "center";
 
-                            const scoreCell = row.insertCell(4);
+                            const scoreCell = row.insertCell(5);
                             scoreCell.textContent = quiz.score;
                             scoreCell.style.textAlign = "center";
                             scoreCell.style.fontWeight = "bold";
-                            scoreCell.style.color = "#f59e0b";
+                            scoreCell.style.color = "yellow";
 
-                            const tagsCell = row.insertCell(5);
+                            const tagsCell = row.insertCell(6);
                             if (quiz.tags && quiz.tags.length > 0) {
                                 const tagsContainer =
                                     document.createElement("div");
@@ -455,7 +461,7 @@
                                 tagsCell.style.color = "var(--secondary)";
                             }
 
-                            const actionsCell = row.insertCell(6);
+                            const actionsCell = row.insertCell(7);
                             actionsCell.style.display = "flex";
                             actionsCell.style.gap = "5px";
                             actionsCell.style.flexWrap = "wrap";
@@ -529,7 +535,7 @@
                         console.error("Failed to load quizzes:", error);
                         showError("❌ Не удалось загрузить викторины");
                         tbody.innerHTML =
-                            '<tr><td colspan="7" style="text-align: center;">⚠️ Ошибка загрузки</td</tr>';
+                            '<tr><td colspan="8" style="text-align: center;">⚠️ Ошибка загрузки</td</tr>';
                     },
                 );
             }
