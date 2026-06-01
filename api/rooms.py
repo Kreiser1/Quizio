@@ -281,7 +281,8 @@ async def room_stream(
     try:
         while True:
             if room_token not in roomsvc.ROOMS:
-                await websocket.close(code=1008, reason="Комната была завершена.")
+                await websocket.send_json(room_stream.model_dump(mode='json'))
+                await websocket.close(code=1000, reason="Комната была завершена.")
                 break
 
             if user.connection == 'banned' and not role in ('moderator', 'administrator'):
