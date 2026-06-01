@@ -107,7 +107,7 @@ class Question(BaseModel):
     code: Text | None = None
     type: QuestionType | None
     answer: set[Uint] | Uint | Text | None
-    hint: set[Uint] | None
+    hint: set[Uint] | None = None
     time: Ufloat | None = None
 
 
@@ -220,14 +220,14 @@ class RoomStream(BaseModel):
     users: set[RoomUser]
     teams: set[RoomTeam]
     privacy: Privacy
-    question: Uint | None
-    score: Uint | None
+    question: Uint | None = None
+    score: Uint | None = None
     text: Text
     question_title: Name
-    image: Base64 | None
-    code: Text | None
-    question_type: QuestionType | None
-    hint: set[Uint] | None
+    image: Base64 | None = None
+    code: Text | None = None
+    question_type: QuestionType | None = None
+    hint: set[Uint] | None = None
     time: Ufloat | None = None
 
 

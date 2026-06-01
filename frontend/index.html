@@ -1,0 +1,456 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Quizio - Главная</title>
+    </head>
+    <link rel="stylesheet" href="theme.css" />
+    <script src="utils.js"></script>
+
+    <body>
+        <section class="nav glass">
+            <h1
+                style="
+                    text-shadow:
+                        0 0 40px #fff,
+                        0 0 80px #fff;
+                "
+            >
+                Quizio
+            </h1>
+            <a href="/"><h4>🏠 Главная</h4></a>
+            <a href="/profile.html"><h4>👤 Профиль</h4></a>
+            <a href="/achievements.html"><h4>🏆 Достижения</h4></a>
+            <a href="/quizzes.html" id="quizzes-btn" style="display: none"
+                ><h4>📚 Викторины</h4></a
+            >
+            <a href="/admin.html" id="admin-btn" style="display: none"
+                ><h4>👑 Администрирование</h4></a
+            >
+        </section>
+        <section class="profile glass">
+            <a href="/profile.html"
+                ><img id="profile-avatar" class="small-picture"
+            /></a>
+            <h3 id="profile-name" style="margin-left: 10px"></h3>
+        </section>
+        <section
+            class="main glass"
+            style="
+                display: grid;
+                grid-template-rows: 1fr auto;
+                justify-content: stretch;
+                align-items: start;
+            "
+        >
+            <div style="overflow-x: auto">
+                <label>
+                    <h3>Комнаты</h3>
+                </label>
+                <table style="width: 100%">
+                    <thead>
+                        <tr>
+                            <th></th>
+                            <th>Название</th>
+                            <th>Билет</th>
+                            <th>Викторина</th>
+                            <th>Владелец</th>
+                            <th>Игроков</th>
+                            <th>Статус</th>
+                        </tr>
+                    </thead>
+                    <tbody id="rooms"></tbody>
+                </table>
+                <p style="color: crimson" id="rooms-error"></p>
+            </div>
+            <div
+                style="
+                    display: flex;
+                    flex-direction: row;
+                    gap: 5px;
+                    align-items: center;
+                    justify-content: stretch;
+                "
+            >
+                <input type="search" id="search-query" placeholder="Поиск..." />
+                <input
+                    type="number"
+                    min="0"
+                    id="search-count"
+                    placeholder="Количество"
+                />
+                <input
+                    type="number"
+                    min="0"
+                    id="search-offset"
+                    placeholder="Страница"
+                />
+                <button
+                    id="create-room-btn"
+                    class="success"
+                    style="display: none"
+                >
+                    Создать
+                </button>
+                <button
+                    id="join-room-btn"
+                    class="primary"
+                    style="display: none"
+                >
+                    🔑 Войти по билету
+                </button>
+            </div>
+        </section>
+        <section
+            class="side glass scroll"
+            style="display: flex; flex-direction: column"
+        >
+            <a href="/achievements.html"><h4>🏆 Достижения</h4></a>
+            <table>
+                <tbody id="achievements"></tbody>
+            </table>
+            <p style="color: crimson" id="achievements-error"></p>
+        </section>
+        <script>
+            let currentUserRole = "user";
+            let currentUsername = "";
+            let refreshTimeout = null;
+
+            function getImageUrl(icon) {
+                if (typeof icon === "number") {
+                    return load_preset(`${icon}.png`);
+                } else if (typeof icon === "string" && icon.length > 0) {
+                    return `data:image/png;base64,${icon}`;
+                }
+                return null;
+            }
+
+            function getRoleColor(role) {
+                return role === "administrator"
+                    ? "crimson"
+                    : role === "moderator"
+                      ? "yellow"
+                      : "greenyellow";
+            }
+
+            function showError(message) {
+                const errorElement = document.getElementById("rooms-error");
+                errorElement.textContent = message;
+                errorElement.style.color = "crimson";
+
+                setTimeout(() => {
+                    if (errorElement.textContent === message) {
+                        errorElement.style.opacity = "0.5";
+                        setTimeout(() => {
+                            if (errorElement.textContent === message) {
+                                errorElement.textContent = "";
+                                errorElement.style.opacity = "";
+                            }
+                        }, 2000);
+                    }
+                }, 3000);
+            }
+
+            function joinByCode() {
+                const roomToken = prompt("🔑 Введите билет комнаты для входа:");
+                if (!roomToken) return;
+
+                const hexPattern = /^[0-9a-fA-F]+$/;
+                if (!hexPattern.test(roomToken)) {
+                    showError("❌ Неверный формат билета");
+                    return;
+                }
+
+                RoomsAPI.get(
+                    roomToken,
+                    () => {
+                        redirect(`/room.html?token=${roomToken}`);
+                    },
+                    (error) => {
+                        console.error("Failed to find room:", error);
+                        showError("❌ Комната с таким билетом не найдена");
+                    },
+                );
+            }
+
+            function loadProfile() {
+                UsersAPI.get_profile(
+                    (profile) => {
+                        currentUsername = profile.username;
+                        currentUserRole = profile.role;
+
+                        const nameElement =
+                            document.getElementById("profile-name");
+                        nameElement.textContent =
+                            profile.nickname || profile.username;
+                        nameElement.style.color = getRoleColor(profile.role);
+
+                        const avatarUrl = getImageUrl(profile.avatar);
+                        const avatarElement =
+                            document.getElementById("profile-avatar");
+
+                        if (avatarUrl) {
+                            avatarElement.src = avatarUrl;
+                            avatarElement.onerror = () => {
+                                avatarElement.style.display = "none";
+                            };
+                        } else {
+                            avatarElement.style.display = "none";
+                        }
+
+                        const createBtn =
+                            document.getElementById("create-room-btn");
+                        const joinBtn =
+                            document.getElementById("join-room-btn");
+
+                        if (
+                            currentUserRole === "moderator" ||
+                            currentUserRole === "administrator"
+                        ) {
+                            createBtn.style.display = "block";
+                            joinBtn.style.display = "none";
+                        } else {
+                            createBtn.style.display = "none";
+                            joinBtn.style.display = "block";
+                        }
+
+                        const quizzesBtn =
+                            document.getElementById("quizzes-btn");
+                        if (
+                            currentUserRole === "moderator" ||
+                            currentUserRole === "administrator"
+                        ) {
+                            quizzesBtn.style.display = "block";
+                        } else {
+                            quizzesBtn.style.display = "none";
+                        }
+
+                        const adminBtn = document.getElementById("admin-btn");
+                        if (adminBtn) {
+                            adminBtn.style.display =
+                                currentUserRole === "administrator"
+                                    ? "block"
+                                    : "none";
+                        }
+                    },
+                    (error) => {
+                        console.error("Failed to load profile:", error);
+                        if (
+                            error.message.includes("401") ||
+                            error.message.includes("403") ||
+                            error.message.includes("404")
+                        ) {
+                            redirect("/login.html");
+                        }
+                    },
+                );
+            }
+
+            function loadAchievements() {
+                AchievementsAPI.get_my_achievements(
+                    (achievements) => {
+                        const tbody = document.getElementById("achievements");
+                        const errorElement =
+                            document.getElementById("achievements-error");
+
+                        tbody.innerHTML = "";
+                        errorElement.textContent = "";
+
+                        if (achievements.length === 0) {
+                            const row = tbody.insertRow();
+                            const cell = row.insertCell(0);
+                            cell.colSpan = 2;
+                            cell.textContent = "✨ Нет достижений";
+                            cell.style.textAlign = "center";
+                            cell.style.padding = "20px";
+                            cell.className = "no-select";
+                            return;
+                        }
+
+                        achievements.forEach((achievement) => {
+                            const row = tbody.insertRow();
+
+                            const iconCell = row.insertCell(0);
+                            const iconUrl = getImageUrl(achievement.icon);
+                            if (iconUrl) {
+                                const iconImg = document.createElement("img");
+                                iconImg.className = "small-picture";
+                                iconImg.src = iconUrl;
+                                iconImg.onerror = () => {
+                                    iconImg.style.display = "none";
+                                };
+                                iconCell.appendChild(iconImg);
+                            }
+
+                            const titleCell = row.insertCell(1);
+                            titleCell.textContent = achievement.title;
+                            titleCell.style.paddingLeft = "10px";
+                        });
+                    },
+                    (error) => {
+                        console.error("Failed to load achievements:", error);
+                        document.getElementById(
+                            "achievements-error",
+                        ).textContent = "❌ Не удалось загрузить достижения";
+                    },
+                );
+            }
+
+            function loadRooms(query, count, offset) {
+                const tbody = document.getElementById("rooms");
+                const errorElement = document.getElementById("rooms-error");
+
+                tbody.innerHTML =
+                    '<tr><td colspan="7" style="text-align: center;">⏳ Загрузка...</td</tr>';
+                errorElement.textContent = "";
+
+                const params = {
+                    query: query || undefined,
+                    count: parseInt(count) || 25,
+                    offset: parseInt(offset) || 0,
+                };
+
+                RoomsAPI.search(
+                    params,
+                    (rooms) => {
+                        tbody.innerHTML = "";
+
+                        if (rooms.length === 0) {
+                            const row = tbody.insertRow();
+                            const cell = row.insertCell(0);
+                            cell.colSpan = 7;
+                            cell.textContent = "📭 Нет доступных комнат";
+                            cell.style.textAlign = "center";
+                            cell.style.padding = "20px";
+                            return;
+                        }
+
+                        rooms.forEach((room) => {
+                            const row = tbody.insertRow();
+                            row.style.cursor = "pointer";
+                            row.style.transition = "background-color 0.2s";
+
+                            row.onclick = () => {
+                                redirect(`/room.html?token=${room.room_token}`);
+                            };
+
+                            row.onmouseenter = () => {
+                                row.style.backgroundColor =
+                                    "rgba(255, 255, 255, 0.05)";
+                            };
+                            row.onmouseleave = () => {
+                                row.style.backgroundColor = "";
+                            };
+
+                            const iconCell = row.insertCell(0);
+                            const iconUrl = getImageUrl(room.quiz?.icon);
+                            if (iconUrl) {
+                                const iconImg = document.createElement("img");
+                                iconImg.className = "small-picture";
+                                iconImg.style.display = "block";
+                                iconImg.src = iconUrl;
+                                iconImg.onerror = () => {
+                                    iconImg.style.display = "none";
+                                };
+                                iconCell.appendChild(iconImg);
+                            }
+
+                            const titleCell = row.insertCell(1);
+                            titleCell.textContent = room.title;
+                            titleCell.style.fontWeight = "bold";
+
+                            const tokenCell = row.insertCell(2);
+                            tokenCell.textContent = room.room_token;
+                            tokenCell.style.fontFamily = "monospace";
+
+                            const quizCell = row.insertCell(3);
+                            quizCell.textContent = room.quiz.title;
+
+                            const ownerCell = row.insertCell(4);
+                            ownerCell.textContent = room.owner;
+
+                            const playersCell = row.insertCell(5);
+                            playersCell.textContent = `${room.users} 👥`;
+
+                            const statusCell = row.insertCell(6);
+                            if (room.state === "active") {
+                                statusCell.textContent = "🟢 Активна";
+                                statusCell.style.color = "#10b981";
+                            } else {
+                                statusCell.textContent = "🟡 Ожидание";
+                                statusCell.style.color = "#f59e0b";
+                            }
+                        });
+                    },
+                    (error) => {
+                        console.error("Failed to load rooms:", error);
+                        errorElement.textContent =
+                            "❌ Не удалось загрузить комнаты.";
+                        tbody.innerHTML =
+                            '<tr><td colspan="7" style="text-align: center;">⚠️ Ошибка загрузки</td</tr>';
+                    },
+                );
+            }
+
+            let searchTimeout = null;
+            function onSearchChange() {
+                if (searchTimeout) clearTimeout(searchTimeout);
+                searchTimeout = setTimeout(() => {
+                    const query = document.getElementById("search-query").value;
+                    const count = document.getElementById("search-count").value;
+                    const offset =
+                        document.getElementById("search-offset").value;
+                    loadRooms(query, count, offset);
+                }, 500);
+            }
+
+            function startAutoRefresh() {
+                if (refreshTimeout) clearInterval(refreshTimeout);
+                refreshTimeout = setInterval(() => {
+                    const query = document.getElementById("search-query").value;
+                    const count = document.getElementById("search-count").value;
+                    const offset =
+                        document.getElementById("search-offset").value;
+                    loadRooms(query, count, offset);
+                }, 10000);
+            }
+
+            function init() {
+                loadProfile();
+                loadAchievements();
+
+                const query = document.getElementById("search-query").value;
+                const count = document.getElementById("search-count").value;
+                const offset = document.getElementById("search-offset").value;
+                loadRooms(query, count, offset);
+
+                document
+                    .getElementById("search-query")
+                    .addEventListener("input", onSearchChange);
+                document
+                    .getElementById("search-count")
+                    .addEventListener("change", () => onSearchChange());
+                document
+                    .getElementById("search-offset")
+                    .addEventListener("change", () => onSearchChange());
+
+                document.getElementById("create-room-btn").onclick = () => {
+                    redirect("/quizzes.html");
+                };
+
+                document.getElementById("join-room-btn").onclick = () => {
+                    joinByCode();
+                };
+
+                startAutoRefresh();
+            }
+
+            if (document.readyState === "loading") {
+                document.addEventListener("DOMContentLoaded", init);
+            } else {
+                init();
+            }
+        </script>
+    </body>
+</html>

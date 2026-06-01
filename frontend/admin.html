@@ -1,0 +1,628 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Quizio - Администрирование</title>
+    </head>
+    <link rel="stylesheet" href="theme.css" />
+    <script src="utils.js"></script>
+
+    <body>
+        <section class="nav glass">
+            <h1>Quizio</h1>
+            <a href="/"><h4>🏠 Главная</h4></a>
+            <a href="/profile.html"><h4>👤 Профиль</h4></a>
+            <a href="/achievements.html"><h4>🏆 Достижения</h4></a>
+            <a href="/quizzes.html"><h4>📚 Викторины</h4></a>
+        </section>
+
+        <section class="profile glass">
+            <a href="/profile.html"
+                ><img id="profile-avatar" class="small-picture"
+            /></a>
+            <h3 id="profile-name" style="margin-left: 10px"></h3>
+        </section>
+
+        <section
+            class="main glass"
+            style="display: flex; flex-direction: column; width: 100%"
+        >
+            <div
+                style="
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    margin-bottom: 20px;
+                    flex-wrap: wrap;
+                    gap: 10px;
+                    width: 100%;
+                "
+            >
+                <h3>👑 Управление пользователями</h3>
+            </div>
+
+            <div
+                style="
+                    display: flex;
+                    flex-direction: row;
+                    align-items: center;
+                    width: 100%;
+                    justify-content: stretch;
+                    gap: 10px;
+                    margin-bottom: 20px;
+                    flex-wrap: wrap;
+                "
+            >
+                <input
+                    type="search"
+                    id="search-query"
+                    placeholder="Поиск..."
+                    style="flex: 1; min-width: 200px"
+                />
+                <input
+                    type="number"
+                    min="0"
+                    id="search-count"
+                    placeholder="Количество"
+                    style="width: 120px"
+                />
+                <input
+                    type="number"
+                    min="0"
+                    id="search-offset"
+                    placeholder="Страница"
+                    style="width: 120px"
+                />
+                <button id="search-btn" class="primary">🔍 Поиск</button>
+            </div>
+
+            <div style="flex: 1; overflow-x: auto; width: 100%">
+                <table style="width: 100%; min-width: 800px">
+                    <thead>
+                        <tr>
+                            <th style="width: 60px"></th>
+                            <th>Имя пользователя</th>
+                            <th>Никнейм</th>
+                            <th>Роль</th>
+                            <th>Email</th>
+                            <th>Дата регистрации</th>
+                            <th style="width: 280px">Действия</th>
+                        </tr>
+                    </thead>
+                    <tbody id="users"></tbody>
+                </table>
+            </div>
+
+            <p
+                id="users-error"
+                style="color: crimson; text-align: center; display: none"
+            ></p>
+        </section>
+
+        <section class="side glass scroll" style="width: 100%">
+            <h4>📊 Статистика</h4>
+            <div
+                id="stats"
+                style="padding: 20px; text-align: center; width: 100%"
+            >
+                <div
+                    style="
+                        font-size: 32px;
+                        font-weight: bold;
+                        margin-bottom: 10px;
+                    "
+                >
+                    <span id="total-count">0</span>
+                </div>
+                <div
+                    style="
+                        font-size: 14px;
+                        color: var(--secondary);
+                        margin-bottom: 20px;
+                    "
+                >
+                    пользователей найдено
+                </div>
+                <div
+                    style="
+                        font-size: 24px;
+                        font-weight: bold;
+                        margin-bottom: 10px;
+                    "
+                >
+                    <span id="admin-count">0</span>
+                </div>
+                <div
+                    style="
+                        font-size: 14px;
+                        color: var(--secondary);
+                        margin-bottom: 20px;
+                    "
+                >
+                    администраторов
+                </div>
+                <div
+                    style="
+                        font-size: 24px;
+                        font-weight: bold;
+                        margin-bottom: 10px;
+                    "
+                >
+                    <span id="moderator-count">0</span>
+                </div>
+                <div style="font-size: 14px; color: var(--secondary)">
+                    модераторов
+                </div>
+            </div>
+        </section>
+
+        <script>
+            let currentUserRole = "user";
+            let currentUsername = "";
+            let currentOffset = 0;
+            let currentCount = 25;
+            let currentQuery = "";
+
+            function getImageUrl(icon) {
+                if (typeof icon === "number") {
+                    return load_preset(`${icon}.png`);
+                } else if (typeof icon === "string" && icon.length > 0) {
+                    return `data:image/png;base64,${icon}`;
+                }
+                return null;
+            }
+
+            function getRoleColor(role) {
+                return role === "administrator"
+                    ? "crimson"
+                    : role === "moderator"
+                      ? "yellow"
+                      : "greenyellow";
+            }
+
+            function getRoleName(role) {
+                return role === "administrator"
+                    ? "👑 Администратор"
+                    : role === "moderator"
+                      ? "🛡️ Модератор"
+                      : "👤 Пользователь";
+            }
+
+            function showMessage(element, message, isError = true) {
+                if (!element) return;
+                element.textContent = message;
+                element.style.display = "block";
+
+                if (!isError) {
+                    setTimeout(() => {
+                        if (element.textContent === message) {
+                            element.style.opacity = "0.5";
+                            setTimeout(() => {
+                                if (element.textContent === message) {
+                                    element.style.display = "none";
+                                    element.style.opacity = "";
+                                }
+                            }, 2000);
+                        }
+                    }, 3000);
+                }
+            }
+
+            function showConfirm(message, onConfirm) {
+                if (confirm(message)) {
+                    onConfirm();
+                }
+            }
+
+            function loadProfile() {
+                UsersAPI.get_profile(
+                    (profile) => {
+                        currentUsername = profile.username;
+                        currentUserRole = profile.role;
+
+                        const nameElement =
+                            document.getElementById("profile-name");
+                        nameElement.textContent =
+                            profile.nickname || profile.username;
+                        nameElement.style.color = getRoleColor(profile.role);
+
+                        const avatarUrl = getImageUrl(profile.avatar);
+                        const avatarElement =
+                            document.getElementById("profile-avatar");
+                        if (avatarUrl) {
+                            avatarElement.src = avatarUrl;
+                            avatarElement.onerror = () =>
+                                (avatarElement.style.display = "none");
+                        } else {
+                            avatarElement.style.display = "none";
+                        }
+
+                        if (currentUserRole !== "administrator") {
+                            redirect("/");
+                        }
+                    },
+                    (error) => {
+                        console.error("Failed to load profile:", error);
+                        if (
+                            error.message.includes("401") ||
+                            error.message.includes("403") ||
+                            error.message.includes("404")
+                        ) {
+                            redirect("/login.html");
+                        }
+                    },
+                );
+            }
+
+            function loadUsers() {
+                const tbody = document.getElementById("users");
+                const errorElement = document.getElementById("users-error");
+
+                tbody.innerHTML =
+                    '<tr><td colspan="7" style="text-align: center;">⏳ Загрузка...</td></tr>';
+                errorElement.style.display = "none";
+
+                const params = new URLSearchParams();
+                if (currentQuery) params.append("query", currentQuery);
+                params.append("count", currentCount);
+                params.append("offset", currentOffset);
+
+                const url = `/api/admin/query?${params.toString()}`;
+
+                fetch(url, {
+                    method: "GET",
+                    credentials: "include",
+                })
+                    .then((response) => {
+                        if (!response.ok)
+                            throw new Error(
+                                `${response.status} ${response.statusText}`,
+                            );
+                        return response.json();
+                    })
+                    .then((users) => {
+                        tbody.innerHTML = "";
+
+                        if (users.length === 0) {
+                            const row = tbody.insertRow();
+                            const cell = row.insertCell(0);
+                            cell.colSpan = 7;
+                            cell.textContent = "📭 Нет пользователей";
+                            cell.style.textAlign = "center";
+                            cell.style.padding = "40px";
+                            cell.className = "no-select";
+                            return;
+                        }
+
+                        let adminCount = 0;
+                        let moderatorCount = 0;
+
+                        users.forEach((user) => {
+                            if (user.role === "administrator") adminCount++;
+                            if (user.role === "moderator") moderatorCount++;
+
+                            const row = tbody.insertRow();
+                            row.style.borderBottom =
+                                "1px solid var(--border-color)";
+
+                            const avatarCell = row.insertCell(0);
+                            const avatarUrl = getImageUrl(user.avatar);
+                            if (avatarUrl) {
+                                const avatarImg = document.createElement("img");
+                                avatarImg.className = "small-picture";
+                                avatarImg.src = avatarUrl;
+                                avatarImg.onerror = () =>
+                                    (avatarImg.style.display = "none");
+                                avatarCell.appendChild(avatarImg);
+                            }
+
+                            const usernameCell = row.insertCell(1);
+                            usernameCell.textContent = user.username;
+                            usernameCell.style.fontWeight = "bold";
+
+                            const nicknameCell = row.insertCell(2);
+                            nicknameCell.textContent = user.nickname || "—";
+
+                            const roleCell = row.insertCell(3);
+                            roleCell.textContent = getRoleName(user.role);
+                            roleCell.style.color = getRoleColor(user.role);
+                            roleCell.style.fontWeight = "bold";
+
+                            const emailCell = row.insertCell(4);
+                            emailCell.textContent = user.email || "—";
+                            emailCell.style.fontSize = "12px";
+
+                            const dateCell = row.insertCell(5);
+                            dateCell.textContent = user.creation_date || "—";
+                            dateCell.style.fontSize = "12px";
+
+                            const actionsCell = row.insertCell(6);
+                            actionsCell.style.display = "flex";
+                            actionsCell.style.gap = "5px";
+                            actionsCell.style.flexWrap = "wrap";
+
+                            const nicknameBtn =
+                                document.createElement("button");
+                            nicknameBtn.textContent = "✏️ Имя";
+                            nicknameBtn.className = "primary";
+                            nicknameBtn.style.padding = "5px 10px";
+                            nicknameBtn.style.fontSize = "12px";
+                            nicknameBtn.title = "Изменить никнейм";
+                            nicknameBtn.onclick = () =>
+                                changeNickname(user.username, user.nickname);
+                            actionsCell.appendChild(nicknameBtn);
+
+                            const passwordBtn =
+                                document.createElement("button");
+                            passwordBtn.textContent = "🔒 Пароль";
+                            passwordBtn.className = "warning";
+                            passwordBtn.style.padding = "5px 10px";
+                            passwordBtn.style.fontSize = "12px";
+                            passwordBtn.title = "Изменить пароль";
+                            passwordBtn.onclick = () =>
+                                changePassword(user.username);
+                            actionsCell.appendChild(passwordBtn);
+
+                            const avatarBtn = document.createElement("button");
+                            avatarBtn.textContent = "🖼️ Удалить аватар";
+                            avatarBtn.className = "warning";
+                            avatarBtn.style.padding = "5px 10px";
+                            avatarBtn.style.fontSize = "12px";
+                            avatarBtn.title = "Удалить аватар";
+                            avatarBtn.onclick = () =>
+                                deleteAvatar(user.username);
+                            actionsCell.appendChild(avatarBtn);
+
+                            if (user.role !== "administrator") {
+                                if (user.role === "moderator") {
+                                    const demoteBtn =
+                                        document.createElement("button");
+                                    demoteBtn.textContent =
+                                        "👇 Понизить до пользователя";
+                                    demoteBtn.className = "outline";
+                                    demoteBtn.style.padding = "5px 10px";
+                                    demoteBtn.style.fontSize = "12px";
+                                    demoteBtn.onclick = () =>
+                                        changeRole(user.username, "user");
+                                    actionsCell.appendChild(demoteBtn);
+                                } else {
+                                    const promoteBtn =
+                                        document.createElement("button");
+                                    promoteBtn.textContent =
+                                        "🛡️ Сделать модератором";
+                                    promoteBtn.className = "success";
+                                    promoteBtn.style.padding = "5px 10px";
+                                    promoteBtn.style.fontSize = "12px";
+                                    promoteBtn.onclick = () =>
+                                        changeRole(user.username, "moderator");
+                                    actionsCell.appendChild(promoteBtn);
+                                }
+                            }
+
+                            if (user.username !== currentUsername) {
+                                const deleteBtn =
+                                    document.createElement("button");
+                                deleteBtn.textContent = "🗑️ Удалить";
+                                deleteBtn.className = "danger";
+                                deleteBtn.style.padding = "5px 10px";
+                                deleteBtn.style.fontSize = "12px";
+                                deleteBtn.onclick = () =>
+                                    deleteUser(user.username);
+                                actionsCell.appendChild(deleteBtn);
+                            }
+                        });
+
+                        document.getElementById("total-count").textContent =
+                            users.length;
+                        document.getElementById("admin-count").textContent =
+                            adminCount;
+                        document.getElementById("moderator-count").textContent =
+                            moderatorCount;
+                    })
+                    .catch((error) => {
+                        console.error("Failed to load users:", error);
+                        errorElement.textContent =
+                            "❌ Не удалось загрузить пользователей. Проверьте соединение.";
+                        errorElement.style.display = "block";
+                        tbody.innerHTML =
+                            '<tr><td colspan="7" style="text-align: center;">⚠️ Ошибка загрузки</td></tr>';
+                    });
+            }
+
+            function changeNickname(username, currentNickname) {
+                const newNickname = prompt(
+                    `Введите новый никнейм для пользователя ${username}:`,
+                    currentNickname || "",
+                );
+                if (newNickname === null) return;
+
+                AdminAPI.update_profile(
+                    username,
+                    { nickname: newNickname || null },
+                    () => {
+                        showMessage(
+                            document.getElementById("users-error"),
+                            `✅ Никнейм пользователя ${username} изменен`,
+                            false,
+                        );
+                        loadUsers();
+                    },
+                    (error) => {
+                        console.error("Failed to change nickname:", error);
+                        showMessage(
+                            document.getElementById("users-error"),
+                            `❌ Не удалось изменить никнейм: ${error.message || error}`,
+                        );
+                    },
+                );
+            }
+
+            function changePassword(username) {
+                const newPassword = prompt(
+                    `Введите новый пароль для пользователя ${username}:`,
+                );
+                if (!newPassword) return;
+
+                const confirmPassword = prompt(
+                    `Подтвердите новый пароль для пользователя ${username}:`,
+                );
+                if (newPassword !== confirmPassword) {
+                    showMessage(
+                        document.getElementById("users-error"),
+                        "❌ Пароли не совпадают",
+                    );
+                    return;
+                }
+
+                if (newPassword.length < 5) {
+                    showMessage(
+                        document.getElementById("users-error"),
+                        "❌ Пароль должен содержать минимум 5 символов",
+                    );
+                    return;
+                }
+
+                AdminAPI.update_credentials(
+                    username,
+                    { new_password: newPassword },
+                    () => {
+                        showMessage(
+                            document.getElementById("users-error"),
+                            `✅ Пароль пользователя ${username} изменен`,
+                            false,
+                        );
+                    },
+                    (error) => {
+                        console.error("Failed to change password:", error);
+                        showMessage(
+                            document.getElementById("users-error"),
+                            `❌ Не удалось изменить пароль: ${error.message || error}`,
+                        );
+                    },
+                );
+            }
+
+            function deleteAvatar(username) {
+                showConfirm(
+                    `❓ Удалить аватар пользователя ${username}?`,
+                    () => {
+                        AdminAPI.update_profile(
+                            username,
+                            { avatar: "0" },
+                            () => {
+                                showMessage(
+                                    document.getElementById("users-error"),
+                                    `✅ Аватар пользователя ${username} удален`,
+                                    false,
+                                );
+                                loadUsers();
+                            },
+                            (error) => {
+                                console.error(
+                                    "Failed to delete avatar:",
+                                    error,
+                                );
+                                showMessage(
+                                    document.getElementById("users-error"),
+                                    `❌ Не удалось удалить аватар: ${error.message || error}`,
+                                );
+                            },
+                        );
+                    },
+                );
+            }
+
+            function changeRole(username, newRole) {
+                const roleText =
+                    newRole === "moderator"
+                        ? "модератором"
+                        : "обычным пользователем";
+                showConfirm(
+                    `❓ Изменить роль пользователя ${username} на ${roleText}?`,
+                    () => {
+                        AdminAPI.update_role(
+                            { username: username, role: newRole },
+                            () => {
+                                showMessage(
+                                    document.getElementById("users-error"),
+                                    `✅ Роль пользователя ${username} изменена`,
+                                    false,
+                                );
+                                loadUsers();
+                            },
+                            (error) => {
+                                console.error("Failed to change role:", error);
+                                showMessage(
+                                    document.getElementById("users-error"),
+                                    `❌ Не удалось изменить роль: ${error.message || error}`,
+                                );
+                            },
+                        );
+                    },
+                );
+            }
+
+            function deleteUser(username) {
+                showConfirm(
+                    `❓ Вы уверены, что хотите удалить профиль пользователя ${username}?`,
+                    () => {
+                        AdminAPI.delete_user(
+                            username,
+                            () => {
+                                showMessage(
+                                    document.getElementById("users-error"),
+                                    `✅ Пользователь ${username} удален`,
+                                    false,
+                                );
+                                loadUsers();
+                            },
+                            (error) => {
+                                console.error("Failed to delete user:", error);
+                                showMessage(
+                                    document.getElementById("users-error"),
+                                    `❌ Не удалось удалить пользователя: ${error.message || error}`,
+                                );
+                            },
+                        );
+                    },
+                );
+            }
+
+            function searchUsers() {
+                currentQuery = document.getElementById("search-query").value;
+                currentOffset =
+                    parseInt(document.getElementById("search-offset").value) ||
+                    0;
+                currentCount =
+                    parseInt(document.getElementById("search-count").value) ||
+                    25;
+                loadUsers();
+            }
+
+            function setupEventListeners() {
+                document
+                    .getElementById("search-btn")
+                    .addEventListener("click", searchUsers);
+
+                document
+                    .getElementById("search-query")
+                    .addEventListener("keypress", (e) => {
+                        if (e.key === "Enter") searchUsers();
+                    });
+            }
+
+            function init() {
+                loadProfile();
+                loadUsers();
+                setupEventListeners();
+            }
+
+            if (document.readyState === "loading") {
+                document.addEventListener("DOMContentLoaded", init);
+            } else {
+                init();
+            }
+        </script>
+    </body>
+</html>

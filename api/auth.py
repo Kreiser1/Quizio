@@ -43,7 +43,7 @@ def login(
         value=access_token,
         httponly=True,
         samesite='lax',
-        secure=False
+        secure=not config.DEBUG
     )
 
     response.set_cookie(
@@ -51,7 +51,7 @@ def login(
         value=refresh_token,
         httponly=True,
         samesite='lax',
-        secure=False
+        secure=not config.DEBUG
     )
 
     return schema.Authorization(access_token=access_token, refresh_token=refresh_token)
