@@ -136,6 +136,9 @@ def unauthorize(session: db.Session, username: schema.Username) -> bool:
 
 def update_credentials(session: db.Session, username: schema.Username, user_credentials_update_payload: schema.UserCredentialsUpdate, verify_old_password: bool = True) -> bool:
     if verify_old_password:
+        if not user_credentials_update_payload.old_password:
+            return False
+
         password_hash = session.execute(db.select(db.User.password_hash).where(db.User.username == username)).scalar()
 
         if not password_hash:
@@ -149,6 +152,9 @@ def update_credentials(session: db.Session, username: schema.Username, user_cred
         **({'email_hash': hash(user_credentials_update_payload.new_email, False)} if user_credentials_update_payload.new_email else {}),
         **({'password_hash': hash(user_credentials_update_payload.new_password)} if user_credentials_update_payload.new_password else {})
     }
+
+    if not params:
+        return True
 
     if session.execute(db.update(db.User).where(db.User.username == username).values(**params)).rowcount > 0:
         session.execute(db.delete(db.Auth).where(db.Auth.username == username))

@@ -89,7 +89,7 @@ def get_achievements(session: db.Session) -> list[schema.Achievement]:
         )
         for achievement in achievements
     ]
-
+    
 def test_achievement(session: db.Session, achievement: schema.Achievement, room: schema.Room, room_user: schema.RoomUser) -> bool:
     if session.execute(db.select(db.exists(db.user_achievement).where(
         db.user_achievement.c.achievement_id == achievement.id,

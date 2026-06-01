@@ -1,0 +1,117 @@
+@import url("classless.css");
+
+html > body {
+    background:
+        radial-gradient(at 0% 0%, hsla(253, 30%, 15%, 1) 0, transparent 60%),
+        radial-gradient(at 50% 0%, hsla(275, 85%, 28%, 1) 0, transparent 60%),
+        radial-gradient(at 100% 0%, hsla(339, 80%, 28%, 1) 0, transparent 60%),
+        radial-gradient(at 0% 100%, hsla(263, 80%, 22%, 1) 0, transparent 60%),
+        radial-gradient(
+            at 100% 100%,
+            hsla(280, 90%, 18%, 1) 0,
+            transparent 60%
+        ),
+        linear-gradient(135deg, #160e20 0%, #2b134d 100%);
+    background-size: cover;
+    background-attachment: fixed;
+    min-height: 100vh;
+    max-width: 100vw;
+    display: grid;
+    grid-template: min-content repeat(3, auto) / repeat(4, auto);
+    grid-template-areas:
+        "nav nav nav profile"
+        "main main main side"
+        "main main main side"
+        "main main main side";
+    justify-content: stretch;
+    justify-items: stretch;
+    place-content: stretch stretch;
+    box-sizing: border-box;
+    overflow-x: hidden;
+    padding: 10px;
+    gap: 10px;
+}
+
+@media (max-width: 768px) {
+    html > body {
+        grid-template-areas:
+            "nav"
+            "profile"
+            "main"
+            "side";
+    }
+}
+
+html > body > section {
+    height: auto;
+    min-height: min-content;
+    width: auto;
+    min-width: min-content;
+    gap: 10px;
+    margin: 0;
+}
+
+html > body > section.nav {
+    grid-area: nav;
+    display: flex;
+    justify-content: start;
+    align-items: center;
+}
+
+html > body > section.profile {
+    grid-area: profile;
+    display: flex;
+    justify-content: start;
+    align-items: center;
+}
+
+html > body > section.main {
+    grid-area: main;
+    display: flex;
+    flex-direction: column;
+    justify-content: stretch;
+    align-items: start;
+}
+
+html > body > section.side {
+    grid-area: side;
+    display: flex;
+    flex-direction: column;
+    justify-content: stretch;
+    align-items: start;
+}
+
+img.small-picture {
+    width: 64px;
+    height: 64px;
+}
+
+img.medium-picture {
+    width: 256px;
+    height: 256px;
+}
+
+img.large-picture {
+    width: auto;
+    height: auto;
+}
+
+.hidden {
+    display: none;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+a,
+label,
+th,
+tr,
+img,
+pre,
+code,
+div {
+    user-select: none;
+}

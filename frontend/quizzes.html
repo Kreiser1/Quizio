@@ -1,0 +1,589 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Quizio - Викторины</title>
+    </head>
+    <link rel="stylesheet" href="theme.css" />
+    <script src="utils.js"></script>
+
+    <body>
+        <section class="nav glass">
+            <h1
+                style="
+                    text-shadow:
+                        0 0 40px #fff,
+                        0 0 80px #fff;
+                "
+            >
+                Quizio
+            </h1>
+            <a href="/"><h4>🏠 Главная</h4></a>
+            <a href="/profile.html"><h4>👤 Профиль</h4></a>
+            <a href="/achievements.html"><h4>🏆 Достижения</h4></a>
+            <a href="/admin.html" id="admin-btn" style="display: none"
+                ><h4>👑 Администрирование</h4></a
+            >
+        </section>
+
+        <section class="profile glass">
+            <a href="/profile.html"
+                ><img id="profile-avatar" class="small-picture"
+            /></a>
+            <h3 id="profile-name" style="margin-left: 10px"></h3>
+        </section>
+
+        <section
+            class="main glass"
+            style="display: flex; flex-direction: column; width: 100%"
+        >
+            <div
+                style="
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    margin-bottom: 20px;
+                    flex-wrap: wrap;
+                    gap: 10px;
+                    width: 100%;
+                "
+            >
+                <h3>📚 Все викторины</h3>
+                <button
+                    id="create-quiz-btn"
+                    class="success"
+                    style="display: none"
+                >
+                    Создать
+                </button>
+            </div>
+
+            <div
+                style="
+                    display: flex;
+                    flex-direction: row;
+                    gap: 10px;
+                    margin-bottom: 20px;
+                    flex-wrap: wrap;
+                    justify-content: stretch;
+                    align-items: center;
+                    width: 100%;
+                "
+            >
+                <input
+                    type="search"
+                    id="search-query"
+                    placeholder="Поиск..."
+                    style="flex: 1; min-width: 200px"
+                />
+                <input
+                    type="text"
+                    id="search-tags"
+                    placeholder="🏷️ Теги (через запятую)"
+                    style="flex: 1; min-width: 200px"
+                />
+                <input
+                    type="number"
+                    min="0"
+                    id="search-count"
+                    placeholder="Количество"
+                    style="width: 120px"
+                />
+                <input
+                    type="number"
+                    min="0"
+                    id="search-offset"
+                    placeholder="Страница"
+                    style="width: 120px"
+                />
+                <button id="search-btn" class="primary">🔍 Поиск</button>
+            </div>
+
+            <div style="flex: 1; overflow-x: auto; width: 100%">
+                <table style="width: 100%; min-width: 800px">
+                    <thead>
+                        <tr>
+                            <th style="width: 60px"></th>
+                            <th>Название</th>
+                            <th>Авторы</th>
+                            <th>Вопросов</th>
+                            <th>Баллов</th>
+                            <th>Теги</th>
+                            <th style="width: 200px">Действия</th>
+                        </tr>
+                    </thead>
+                    <tbody id="quizzes"></tbody>
+                </table>
+            </div>
+
+            <p
+                id="quizzes-error"
+                style="color: crimson; text-align: center; display: none"
+            ></p>
+        </section>
+
+        <section class="side glass scroll" style="width: 100%">
+            <h4>📊 Статистика</h4>
+            <div
+                id="stats"
+                style="padding: 20px; text-align: center; width: 100%"
+            >
+                <div
+                    style="
+                        font-size: 32px;
+                        font-weight: bold;
+                        margin-bottom: 10px;
+                    "
+                >
+                    <span id="total-count">0</span>
+                </div>
+                <div
+                    style="
+                        font-size: 14px;
+                        color: var(--secondary);
+                        margin-bottom: 20px;
+                    "
+                >
+                    викторин доступно
+                </div>
+                <div
+                    style="
+                        font-size: 24px;
+                        font-weight: bold;
+                        margin-bottom: 10px;
+                    "
+                >
+                    <span id="total-questions">0</span>
+                </div>
+                <div
+                    style="
+                        font-size: 14px;
+                        color: var(--secondary);
+                        margin-bottom: 20px;
+                    "
+                >
+                    всего вопросов
+                </div>
+                <div
+                    style="
+                        font-size: 24px;
+                        font-weight: bold;
+                        margin-bottom: 10px;
+                    "
+                >
+                    <span id="total-score">0</span>
+                </div>
+                <div style="font-size: 14px; color: var(--secondary)">
+                    всего баллов
+                </div>
+            </div>
+        </section>
+
+        <script>
+            let currentUserRole = "user";
+            let currentUsername = "";
+            let currentOffset = 0;
+            let currentCount = 25;
+            let currentQuery = "";
+            let currentTags = [];
+
+            function getImageUrl(icon) {
+                if (typeof icon === "number") {
+                    return load_preset(`${icon}.png`);
+                } else if (typeof icon === "string" && icon.length > 0) {
+                    return `data:image/png;base64,${icon}`;
+                }
+                return null;
+            }
+
+            function getRoleColor(role) {
+                return role === "administrator"
+                    ? "crimson"
+                    : role === "moderator"
+                      ? "#f59e0b"
+                      : "#10b981";
+            }
+
+            function showError(message) {
+                const errorElement = document.getElementById("quizzes-error");
+                errorElement.textContent = message;
+                errorElement.style.display = "block";
+
+                setTimeout(() => {
+                    if (errorElement.textContent === message) {
+                        errorElement.style.opacity = "0.5";
+                        setTimeout(() => {
+                            if (errorElement.textContent === message) {
+                                errorElement.style.display = "none";
+                                errorElement.style.opacity = "";
+                            }
+                        }, 2000);
+                    }
+                }, 3000);
+            }
+
+            function showConfirm(message, onConfirm) {
+                if (confirm(message)) {
+                    onConfirm();
+                }
+            }
+
+            function createRoom(quizId, quizTitle) {
+                const roomTitle = prompt(
+                    `Введите название комнаты для викторины "${quizTitle}":`,
+                    `Комната: ${quizTitle}`,
+                );
+                if (!roomTitle) return;
+
+                const isPrivate = confirm(
+                    "Сделать комнату приватной? (OK - приватная, Отмена - публичная)",
+                );
+
+                const payload = {
+                    title: roomTitle,
+                    privacy: isPrivate ? "private" : "public",
+                    quiz_id: quizId,
+                };
+
+                RoomsAPI.create(
+                    payload,
+                    (roomToken) => {
+                        redirect(`/room.html?token=${roomToken}`);
+                    },
+                    (error) => {
+                        console.error("Failed to create room:", error);
+                        showError(
+                            `❌ Не удалось создать комнату: ${error.message || error}`,
+                        );
+                    },
+                );
+            }
+
+            function loadProfile() {
+                UsersAPI.get_profile(
+                    (profile) => {
+                        currentUsername = profile.username;
+                        currentUserRole = profile.role;
+
+                        const nameElement =
+                            document.getElementById("profile-name");
+                        nameElement.textContent =
+                            profile.nickname || profile.username;
+                        nameElement.style.color = getRoleColor(profile.role);
+
+                        const avatarUrl = getImageUrl(profile.avatar);
+                        const avatarElement =
+                            document.getElementById("profile-avatar");
+
+                        if (avatarUrl) {
+                            avatarElement.src = avatarUrl;
+                            avatarElement.onerror = () => {
+                                avatarElement.style.display = "none";
+                            };
+                        } else {
+                            avatarElement.style.display = "none";
+                        }
+
+                        const createBtn =
+                            document.getElementById("create-quiz-btn");
+                        if (
+                            currentUserRole === "moderator" ||
+                            currentUserRole === "administrator"
+                        ) {
+                            createBtn.style.display = "block";
+                        } else {
+                            createBtn.style.display = "none";
+                        }
+
+                        const adminBtn = document.getElementById("admin-btn");
+                        if (adminBtn) {
+                            adminBtn.style.display =
+                                currentUserRole === "administrator"
+                                    ? "block"
+                                    : "none";
+                        }
+                    },
+                    (error) => {
+                        console.error("Failed to load profile:", error);
+                        if (
+                            error.message.includes("401") ||
+                            error.message.includes("403")
+                        ) {
+                            redirect("/login.html");
+                        }
+                    },
+                );
+            }
+
+            function parseTags(tagsString) {
+                if (!tagsString) return [];
+                return tagsString
+                    .split(",")
+                    .map((tag) => tag.trim())
+                    .filter((tag) => tag.length > 0)
+                    .map((tag) => (tag.startsWith("#") ? tag : `#${tag}`));
+            }
+
+            function deleteQuiz(quizId, quizTitle) {
+                showConfirm(
+                    `❓ Вы уверены, что хотите удалить викторину "${quizTitle}"?`,
+                    () => {
+                        QuizzesAPI.delete(
+                            quizId,
+                            () => {
+                                loadQuizzes();
+                            },
+                            (error) => {
+                                console.error("Failed to delete quiz:", error);
+                                let errorMessage =
+                                    "❌ Не удалось удалить викторину";
+                                if (
+                                    error.message &&
+                                    error.message.includes("403")
+                                ) {
+                                    errorMessage =
+                                        "❌ У вас нет прав для удаления этой викторины";
+                                }
+                                showError(errorMessage);
+                            },
+                        );
+                    },
+                );
+            }
+
+            function loadQuizzes() {
+                const tbody = document.getElementById("quizzes");
+                const errorElement = document.getElementById("quizzes-error");
+
+                tbody.innerHTML =
+                    '<tr><td colspan="7" style="text-align: center;">⏳ Загрузка...</td</tr>';
+                errorElement.style.display = "none";
+
+                const params = {
+                    count: currentCount,
+                    offset: currentOffset,
+                };
+
+                if (currentQuery) params.query = currentQuery;
+                if (currentTags.length > 0) params.tags = currentTags;
+
+                QuizzesAPI.search(
+                    params,
+                    (quizzes) => {
+                        tbody.innerHTML = "";
+
+                        if (quizzes.length === 0) {
+                            const row = tbody.insertRow();
+                            const cell = row.insertCell(0);
+                            cell.colSpan = 7;
+                            cell.textContent = "📭 Нет доступных викторин";
+                            cell.style.textAlign = "center";
+                            cell.style.padding = "40px";
+                            cell.className = "no-select";
+                            return;
+                        }
+
+                        let totalQuestions = 0;
+                        let totalScore = 0;
+
+                        quizzes.forEach((quiz) => {
+                            const row = tbody.insertRow();
+
+                            totalQuestions += quiz.questions;
+                            totalScore += quiz.score;
+
+                            const iconCell = row.insertCell(0);
+                            const iconUrl = getImageUrl(quiz.icon);
+                            if (iconUrl) {
+                                const iconImg = document.createElement("img");
+                                iconImg.className = "small-picture";
+                                iconImg.style.width = "32px";
+                                iconImg.style.height = "32px";
+                                iconImg.style.display = "block";
+                                iconImg.src = iconUrl;
+                                iconImg.onerror = () => {
+                                    iconImg.style.display = "none";
+                                };
+                                iconCell.appendChild(iconImg);
+                            }
+
+                            const titleCell = row.insertCell(1);
+                            titleCell.textContent = quiz.title;
+                            titleCell.style.fontWeight = "bold";
+
+                            const authorsCell = row.insertCell(2);
+                            authorsCell.textContent = Array.isArray(
+                                quiz.authors,
+                            )
+                                ? quiz.authors.join(", ")
+                                : quiz.authors;
+                            authorsCell.style.fontSize = "12px";
+
+                            const questionsCell = row.insertCell(3);
+                            questionsCell.textContent = quiz.questions;
+                            questionsCell.style.textAlign = "center";
+
+                            const scoreCell = row.insertCell(4);
+                            scoreCell.textContent = quiz.score;
+                            scoreCell.style.textAlign = "center";
+                            scoreCell.style.fontWeight = "bold";
+                            scoreCell.style.color = "#f59e0b";
+
+                            const tagsCell = row.insertCell(5);
+                            if (quiz.tags && quiz.tags.length > 0) {
+                                const tagsContainer =
+                                    document.createElement("div");
+                                tagsContainer.style.display = "flex";
+                                tagsContainer.style.flexWrap = "wrap";
+                                tagsContainer.style.gap = "4px";
+                                quiz.tags.forEach((tag) => {
+                                    const tagSpan =
+                                        document.createElement("span");
+                                    tagSpan.textContent = tag;
+                                    tagSpan.style.backgroundColor =
+                                        "rgba(54, 65, 83, 0.5)";
+                                    tagSpan.style.padding = "2px 6px";
+                                    tagSpan.style.borderRadius = "12px";
+                                    tagSpan.style.fontSize = "11px";
+                                    tagSpan.style.fontFamily = "monospace";
+                                    tagsContainer.appendChild(tagSpan);
+                                });
+                                tagsCell.appendChild(tagsContainer);
+                            } else {
+                                tagsCell.textContent = "—";
+                                tagsCell.style.color = "var(--secondary)";
+                            }
+
+                            const actionsCell = row.insertCell(6);
+                            actionsCell.style.display = "flex";
+                            actionsCell.style.gap = "5px";
+                            actionsCell.style.flexWrap = "wrap";
+
+                            const createRoomBtn =
+                                document.createElement("button");
+                            createRoomBtn.textContent = "🚪 Создать комнату";
+                            createRoomBtn.className = "success";
+                            createRoomBtn.style.padding = "5px 10px";
+                            createRoomBtn.style.fontSize = "12px";
+                            createRoomBtn.title =
+                                "Создать комнату для этой викторины";
+                            createRoomBtn.onclick = (e) => {
+                                e.stopPropagation();
+                                createRoom(quiz.id, quiz.title);
+                            };
+                            actionsCell.appendChild(createRoomBtn);
+
+                            const isAuthor =
+                                quiz.authors &&
+                                quiz.authors.includes(currentUsername);
+                            if (
+                                isAuthor ||
+                                currentUserRole === "administrator" ||
+                                currentUserRole === "moderator"
+                            ) {
+                                const editBtn =
+                                    document.createElement("button");
+                                editBtn.textContent = "✏️";
+                                editBtn.className = "warning";
+                                editBtn.style.padding = "5px 10px";
+                                editBtn.style.fontSize = "12px";
+                                editBtn.title = "Редактировать";
+                                editBtn.onclick = (e) => {
+                                    e.stopPropagation();
+                                    redirect(
+                                        `/create-quiz.html?quiz_id=${quiz.id}`,
+                                    );
+                                };
+                                actionsCell.appendChild(editBtn);
+                            }
+
+                            if (
+                                isAuthor ||
+                                currentUserRole === "administrator" ||
+                                currentUserRole === "moderator"
+                            ) {
+                                const deleteBtn =
+                                    document.createElement("button");
+                                deleteBtn.textContent = "🗑️";
+                                deleteBtn.className = "danger";
+                                deleteBtn.style.padding = "5px 10px";
+                                deleteBtn.style.fontSize = "12px";
+                                deleteBtn.title = "Удалить";
+                                deleteBtn.onclick = (e) => {
+                                    e.stopPropagation();
+                                    deleteQuiz(quiz.id, quiz.title);
+                                };
+                                actionsCell.appendChild(deleteBtn);
+                            }
+                        });
+
+                        document.getElementById("total-count").textContent =
+                            quizzes.length;
+                        document.getElementById("total-questions").textContent =
+                            totalQuestions;
+                        document.getElementById("total-score").textContent =
+                            totalScore;
+                    },
+                    (error) => {
+                        console.error("Failed to load quizzes:", error);
+                        showError("❌ Не удалось загрузить викторины");
+                        tbody.innerHTML =
+                            '<tr><td colspan="7" style="text-align: center;">⚠️ Ошибка загрузки</td</tr>';
+                    },
+                );
+            }
+
+            function searchQuizzes() {
+                currentQuery = document.getElementById("search-query").value;
+                const tagsString = document.getElementById("search-tags").value;
+                currentTags = parseTags(tagsString);
+                currentOffset =
+                    parseInt(document.getElementById("search-offset").value) ||
+                    0;
+                currentCount =
+                    parseInt(document.getElementById("search-count").value) ||
+                    25;
+
+                loadQuizzes();
+            }
+
+            function setupCreateButton() {
+                const createBtn = document.getElementById("create-quiz-btn");
+                if (createBtn) {
+                    createBtn.onclick = () => {
+                        redirect("/create-quiz.html");
+                    };
+                }
+            }
+
+            function init() {
+                loadProfile();
+                loadQuizzes();
+
+                document
+                    .getElementById("search-btn")
+                    .addEventListener("click", searchQuizzes);
+
+                document
+                    .getElementById("search-query")
+                    .addEventListener("keypress", (e) => {
+                        if (e.key === "Enter") searchQuizzes();
+                    });
+                document
+                    .getElementById("search-tags")
+                    .addEventListener("keypress", (e) => {
+                        if (e.key === "Enter") searchQuizzes();
+                    });
+
+                setupCreateButton();
+            }
+
+            if (document.readyState === "loading") {
+                document.addEventListener("DOMContentLoaded", init);
+            } else {
+                init();
+            }
+        </script>
+    </body>
+</html>

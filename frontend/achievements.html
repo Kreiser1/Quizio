@@ -1,0 +1,394 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Quizio - Достижения</title>
+    </head>
+    <link rel="stylesheet" href="theme.css" />
+    <script src="utils.js"></script>
+
+    <body>
+        <section class="nav glass">
+            <h1
+                style="
+                    text-shadow:
+                        0 0 40px #fff,
+                        0 0 80px #fff;
+                "
+            >
+                Quizio
+            </h1>
+            <a href="/"><h4>🏠 Главная</h4></a>
+            <a href="/profile.html"><h4>👤 Профиль</h4></a>
+            <a href="/quizzes.html" id="quizzes-btn" style="display: none"
+                ><h4>📚 Викторины</h4></a
+            >
+            <a href="/admin.html" id="admin-btn" style="display: none"
+                ><h4>👑 Администрирование</h4></a
+            >
+        </section>
+
+        <section class="profile glass">
+            <a href="/profile.html"
+                ><img id="profile-avatar" class="small-picture"
+            /></a>
+            <h3 id="profile-name" style="margin-left: 10px"></h3>
+        </section>
+
+        <section
+            class="main glass"
+            style="display: flex; flex-direction: column; width: 100%"
+        >
+            <div
+                style="
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    margin-bottom: 20px;
+                    flex-wrap: wrap;
+                    gap: 10px;
+                    width: 100%;
+                "
+            >
+                <h3>🏆 Все достижения</h3>
+                <button
+                    id="create-achievement-btn"
+                    class="success"
+                    style="display: none"
+                >
+                    Создать
+                </button>
+            </div>
+
+            <div style="flex: 1; overflow-x: auto; width: 100%">
+                <table style="width: 100%; min-width: 300px">
+                    <thead>
+                        <tr>
+                            <th style="width: 80px"></th>
+                            <th>Название</th>
+                            <th id="condition-header" style="display: none">
+                                Условие
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody id="achievements"></tbody>
+                </table>
+            </div>
+
+            <p
+                id="achievements-error"
+                style="color: crimson; text-align: center; display: none"
+            ></p>
+        </section>
+
+        <section class="side glass scroll" style="width: 100%">
+            <h4>📊 Прогресс</h4>
+            <div
+                id="stats"
+                style="padding: 20px; text-align: center; width: 100%"
+            >
+                <div
+                    style="
+                        font-size: 48px;
+                        font-weight: bold;
+                        margin-bottom: 10px;
+                    "
+                >
+                    <span id="user-count">0</span
+                    ><span style="font-size: 32px">/</span
+                    ><span id="total-count">0</span>
+                </div>
+                <div
+                    style="
+                        font-size: 14px;
+                        color: var(--secondary);
+                        margin-bottom: 20px;
+                    "
+                >
+                    достижений получено
+                </div>
+                <div
+                    style="
+                        width: 100%;
+                        height: 8px;
+                        background-color: var(--border-color);
+                        border-radius: var(--border-radius-full);
+                        overflow: hidden;
+                        margin-bottom: 10px;
+                    "
+                >
+                    <div
+                        id="progress-bar"
+                        style="
+                            width: 0%;
+                            height: 100%;
+                            background: var(--gradient-success);
+                            transition: width 0.3s ease;
+                        "
+                    ></div>
+                </div>
+                <div style="font-size: 12px; color: var(--secondary)">
+                    <span id="percent">0</span>%
+                </div>
+            </div>
+        </section>
+
+        <script>
+            let currentUserRole = "user";
+            let currentUsername = "";
+            let allAchievements = [];
+
+            function getImageUrl(icon) {
+                if (typeof icon === "number") {
+                    return load_preset(`${icon}.png`);
+                } else if (typeof icon === "string" && icon.length > 0) {
+                    return `data:image/png;base64,${icon}`;
+                }
+                return null;
+            }
+
+            function getRoleColor(role) {
+                return role === "administrator"
+                    ? "crimson"
+                    : role === "moderator"
+                      ? "yellow"
+                      : "greenyellow";
+            }
+
+            function showError(message) {
+                const errorElement =
+                    document.getElementById("achievements-error");
+                errorElement.textContent = message;
+                errorElement.style.display = "block";
+
+                setTimeout(() => {
+                    if (errorElement.textContent === message) {
+                        errorElement.style.opacity = "0.5";
+                        setTimeout(() => {
+                            if (errorElement.textContent === message) {
+                                errorElement.style.display = "none";
+                                errorElement.style.opacity = "";
+                            }
+                        }, 2000);
+                    }
+                }, 3000);
+            }
+
+            function updateStats(userCount, totalCount) {
+                const percentage =
+                    totalCount > 0
+                        ? ((userCount / totalCount) * 100).toFixed(1)
+                        : 0;
+                document.getElementById("progress-bar").style.width =
+                    `${percentage}%`;
+                document.getElementById("percent").textContent = percentage;
+            }
+
+            function loadProfile() {
+                UsersAPI.get_profile(
+                    (profile) => {
+                        currentUsername = profile.username;
+                        currentUserRole = profile.role;
+
+                        const nameElement =
+                            document.getElementById("profile-name");
+                        nameElement.textContent =
+                            profile.nickname || profile.username;
+                        nameElement.style.color = getRoleColor(profile.role);
+
+                        const avatarUrl = getImageUrl(profile.avatar);
+                        const avatarElement =
+                            document.getElementById("profile-avatar");
+
+                        if (avatarUrl) {
+                            avatarElement.src = avatarUrl;
+                            avatarElement.onerror = () => {
+                                avatarElement.style.display = "none";
+                            };
+                        } else {
+                            avatarElement.style.display = "none";
+                        }
+
+                        const createBtn = document.getElementById(
+                            "create-achievement-btn",
+                        );
+                        if (
+                            currentUserRole === "moderator" ||
+                            currentUserRole === "administrator"
+                        ) {
+                            createBtn.style.display = "block";
+                        } else {
+                            createBtn.style.display = "none";
+                        }
+
+                        const adminBtn = document.getElementById("admin-btn");
+                        if (adminBtn) {
+                            adminBtn.style.display =
+                                currentUserRole === "administrator"
+                                    ? "block"
+                                    : "none";
+                        }
+
+                        const conditionHeader =
+                            document.getElementById("condition-header");
+                        if (
+                            currentUserRole === "moderator" ||
+                            currentUserRole === "administrator"
+                        ) {
+                            conditionHeader.style.display = "table-cell";
+                        } else {
+                            conditionHeader.style.display = "none";
+                        }
+
+                        const quizzesBtn =
+                            document.getElementById("quizzes-btn");
+                        if (
+                            currentUserRole === "moderator" ||
+                            currentUserRole === "administrator"
+                        ) {
+                            quizzesBtn.style.display = "block";
+                        } else {
+                            quizzesBtn.style.display = "none";
+                        }
+                    },
+                    (error) => {
+                        console.error("Failed to load profile:", error);
+                        if (
+                            error.message.includes("401") ||
+                            error.message.includes("403")
+                        ) {
+                            redirect("/login.html");
+                        }
+                    },
+                );
+            }
+
+            function loadUserAchievements() {
+                AchievementsAPI.get_my_achievements(
+                    (userAchievements) => {
+                        const userCount = userAchievements.length;
+                        document.getElementById("user-count").textContent =
+                            userCount;
+
+                        if (allAchievements.length > 0) {
+                            updateStats(userCount, allAchievements.length);
+                        }
+                    },
+                    (error) => {
+                        console.error(
+                            "Failed to load user achievements:",
+                            error,
+                        );
+                        document.getElementById("user-count").textContent = "0";
+                    },
+                );
+            }
+
+            function loadAllAchievements() {
+                AchievementsAPI.get_all(
+                    (achievements) => {
+                        const tbody = document.getElementById("achievements");
+                        const errorElement =
+                            document.getElementById("achievements-error");
+
+                        tbody.innerHTML = "";
+                        errorElement.style.display = "none";
+                        allAchievements = achievements;
+
+                        const totalCount = achievements.length;
+                        document.getElementById("total-count").textContent =
+                            totalCount;
+
+                        const userCount =
+                            parseInt(
+                                document.getElementById("user-count")
+                                    .textContent,
+                            ) || 0;
+                        updateStats(userCount, totalCount);
+
+                        if (achievements.length === 0) {
+                            const row = tbody.insertRow();
+                            const cell = row.insertCell(0);
+                            cell.colSpan =
+                                currentUserRole === "moderator" ||
+                                currentUserRole === "administrator"
+                                    ? 3
+                                    : 2;
+                            cell.textContent = "✨ Нет доступных достижений";
+                            cell.style.textAlign = "center";
+                            cell.style.padding = "40px";
+                            cell.className = "no-select";
+                            return;
+                        }
+
+                        achievements.forEach((achievement) => {
+                            const row = tbody.insertRow();
+
+                            const iconCell = row.insertCell(0);
+                            const iconUrl = getImageUrl(achievement.icon);
+                            if (iconUrl) {
+                                const iconImg = document.createElement("img");
+                                iconImg.className = "small-picture";
+                                iconImg.style.display = "block";
+                                iconImg.src = iconUrl;
+                                iconImg.onerror = () => {
+                                    iconImg.style.display = "none";
+                                };
+                                iconCell.appendChild(iconImg);
+                            }
+
+                            const titleCell = row.insertCell(1);
+                            titleCell.textContent = achievement.title;
+                            titleCell.style.fontWeight = "bold";
+
+                            if (
+                                currentUserRole === "moderator" ||
+                                currentUserRole === "administrator"
+                            ) {
+                                const conditionCell = row.insertCell(2);
+                                if (achievement.condition) {
+                                    conditionCell.textContent =
+                                        achievement.condition;
+                                    conditionCell.style.fontFamily =
+                                        "monospace";
+                                    conditionCell.style.color = "orange";
+                                }
+                            }
+                        });
+                    },
+                    (error) => {
+                        console.error("Failed to load achievements:", error);
+                        showError("❌ Не удалось загрузить достижения");
+                        document.getElementById("total-count").textContent =
+                            "0";
+                    },
+                );
+            }
+
+            function setupCreateButton() {
+                const createBtn = document.getElementById(
+                    "create-achievement-btn",
+                );
+                if (createBtn) {
+                    createBtn.onclick = () => {
+                        redirect("/create-achievement.html");
+                    };
+                }
+            }
+
+            function init() {
+                loadProfile();
+                loadUserAchievements();
+                loadAllAchievements();
+                setupCreateButton();
+            }
+
+            if (document.readyState === "loading") {
+                document.addEventListener("DOMContentLoaded", init);
+            } else {
+                init();
+            }
+        </script>
+    </body>
+</html>
