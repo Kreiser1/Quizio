@@ -79,7 +79,7 @@ def _authorize(
             value=access_token,
             httponly=True,
             samesite='lax',
-            secure=False
+            secure=not config.DEBUG
         )
     
     return username

@@ -16,6 +16,12 @@ IMAGE_SIZE_LIMIT = int(_config.get('IMAGE_SIZE_LIMIT') or 2097152)
 QUIZ_SIZE_LIMIT = int(_config.get('QUIZ_SIZE_LIMIT') or 8388608)
 FREQUENCY = float(_config.get('FREQUENCY') or 4.0)
 
+DEBUG = _config.get('DEBUG')
+if not DEBUG:
+    DEBUG = False
+elif DEBUG.lower() == 'true':
+    DEBUG = True
+
 if not TOKEN_SECRET or not AUTH_SECRET:
     logging.error("Token or auth secret is not specified in config.env")
     sys.exit(1)
